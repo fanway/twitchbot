@@ -77,12 +77,12 @@ func (bot *Bot) Commands(command string) {
 	if strings.Contains(command, "!logs(") {
 		t := strings.Split(command, "(")[1]
 		name := strings.Split(t, ")")[0]
-		currentPosition, _ := bot.File.Seek(0, 1)
 		offset, err := bot.File.Seek(0, io.SeekStart)
 		if err != nil {
 			panic(err)
 		}
 		r := bufio.NewScanner(bot.File)
+		fmt.Println(offset)
 		var str string
 		for r.Scan() {
 			str = r.Text()
