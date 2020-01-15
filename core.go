@@ -103,9 +103,19 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 func (bot *Bot) Commands(command string, username string) {
 	// !logs(username, timeStart, timeEnd)
 	if strings.Contains(command, "!logs(") {
-		t := strings.Split(command, "(")[1]
-		params := strings.Split(t, ")")[0]
+		startIdx := strings.Index(command, "(") + 1
+		endIdx := strings.Index(command, ")")
+		if startIdx == -1 || endIdx == -1 {
+			fmt.Println("!logs: wrong syntax")
+			return
+		}
+		params := command[startIdx:endIdx]
+		// username, timeStart, timeEnd (utt)
 		utt := strings.Split(params, ",")
+		if len(utt) < 3 {
+			fmt.Println("!logs: wrong amount of params")
+			return
+		}
 		layout := "2006-01-02 15:04:05 -0700 MST"
 		username := utt[0]
 		timeStart, err := time.Parse(layout, "2019-"+strings.TrimSpace(utt[1])+":00 +0300 MSK")
@@ -146,16 +156,17 @@ func (bot *Bot) Commands(command string, username string) {
 			}
 		}
 	}
+	// !smartvote 1-2
 	if strings.Contains(command, "!smartvote") {
 		bot.Utils.SmartVote.Options = make(map[string]int)
 		bot.Utils.SmartVote.Votes = make(map[string]string)
 		bot.Status = "smartvote"
-        split := strings.Split(command, " ")
-        if len(split) < 2 {
-            fmt.Println("Not enough args")
-            bot.Status = "Running"
-            return
-        }
+		split := strings.Split(command, " ")
+		if len(split) < 2 {
+			fmt.Println("Not enough args")
+			bot.Status = "Running"
+			return
+		}
 
 		str := "GOLOSOVANIE"
 		fmt.Fprintf(bot.Conn, "PRIVMSG %s :%s\r\n", bot.Channel, str)
