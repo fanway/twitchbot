@@ -59,6 +59,11 @@ func (bot *Bot) Pong(line string) {
 func (bot *Bot) reader(wg *sync.WaitGroup) {
 	tp := textproto.NewReader(bufio.NewReader(bot.Conn))
 	w := bufio.NewWriter(bot.File)
+	pasteFile, err := os.OpenFile("paste.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println(err)
+	}
+	pasteWriter := bufio.NewWriter(pasteFile)
 	for {
 		line, err := tp.ReadLine()
 		if err != nil {
@@ -72,13 +77,17 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 			usermessage := strings.Replace(userdata[1], " :", "", 1)
 			fmt.Fprintf(w, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05 -0700 MST"), username, usermessage)
 			w.Flush()
-			if bot.Status == "smartvote" && len(usermessage) == 1 {
+			messageLength := len(usermessage)
+			if bot.Status == "smartvote" && messageLength == 1 {
 				if _, ok := bot.Utils.SmartVote.Options[usermessage]; ok {
 					if _, ok := bot.Utils.SmartVote.Votes[username]; !ok {
 						bot.Utils.SmartVote.Options[usermessage]++
 						bot.Utils.SmartVote.Votes[username] = usermessage
 					}
 				}
+			}
+			if messageLength >= 200 && messageLength <= 500 {
+				fmt.Fprintf(pasteWriter, "%s\n\n", usermessage)
 			}
 
 			if bot.Authority[username] == "top" && usermessage[0:1] == "!" {
@@ -144,7 +153,6 @@ func main() {
 	}
 	defer logfile.Close()
 	m := authorityInit()
-	fmt.Println(m["top"])
 	bot := Bot{
 		Channel:   channel,
 		Name:      "funwayz",
