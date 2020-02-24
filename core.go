@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	//"io/ioutil"
@@ -57,6 +58,20 @@ type ChatData struct {
 	} `json:"chatters"`
 }
 
+func requestJSON(req *http.Request, timeout int, obj interface{}) error {
+	client := &http.Client{Timeout: time.Second * time.Duration(timeout)}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&obj)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func findPerson(name string) {
 	db, err := sql.Open("sqlite3", "./data.db?_busy_timeout=5000&cache=shared&mode=rwc")
 	if err != nil {
@@ -70,7 +85,6 @@ func findPerson(name string) {
 		return
 	}
 	defer tx.Rollback()
-	client := &http.Client{}
 	var id string
 	row := tx.QueryRow("SELECT FromId FROM Followers WHERE FromName=$1;", name)
 	err = row.Scan(&id)
@@ -78,14 +92,8 @@ func findPerson(name string) {
 		url := "https://api.twitch.tv/helix/users?login=" + name
 		req, _ := http.NewRequest("GET", url, nil)
 		req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		decoder := json.NewDecoder(res.Body)
 		var iddata IdData
-		err = decoder.Decode(&iddata)
+		err := requestJSON(req, 10, &iddata)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -95,36 +103,19 @@ func findPerson(name string) {
 	url := "https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
-
-	res, err := client.Do(req)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	decoder := json.NewDecoder(res.Body)
 	var followers Followers
-	err = decoder.Decode(&followers)
+	err = requestJSON(req, 10, &followers)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
 	cursor := followers.Pagination.Cursor
 	for i := 0; i < followers.Total/100; i++ {
 		url = "https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id + "&after=" + cursor
 		req, _ = http.NewRequest("GET", url, nil)
 		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
-
-		res, err = client.Do(req)
-
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		decoder = json.NewDecoder(res.Body)
 		var temp Followers
-		err = decoder.Decode(&temp)
+		err = requestJSON(req, 10, &temp)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -210,22 +201,10 @@ func findPerson(name string) {
 		var toName string
 		rows.Scan(&toName)
 		url = "https://tmi.twitch.tv/group/user/" + strings.ToLower(toName) + "/chatters"
-
 		req, _ := http.NewRequest("GET", url, nil)
-		res, err := client.Do(req)
-
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-
-		decoder := json.NewDecoder(res.Body)
-
 		var chatData ChatData
-		err = decoder.Decode(&chatData)
-
+		err = requestJSON(req, 10, &chatData)
 		if err != nil {
-			//fmt.Println(toName)
 			//fmt.Println(err)
 			continue
 		}
