@@ -72,12 +72,17 @@ func requestJSON(req *http.Request, timeout int, obj interface{}) error {
 	return nil
 }
 
-func findPerson(name string) {
+func connectDb() *sql.DB {
 	db, err := sql.Open("sqlite3", "./data.db?_busy_timeout=5000&cache=shared&mode=rwc")
 	if err != nil {
 		panic(err)
 	}
 	db.SetMaxOpenConns(1)
+	return db
+}
+
+func findPerson(name string) {
+	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -233,6 +238,29 @@ func findPerson(name string) {
 	fmt.Println("-----------------------")
 }
 
+func personsList() {
+	db := connectDb()
+	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer tx.Rollback()
+	rows, err := tx.Query("SELECT DISTINCT FromName FROM Followers;")
+	defer rows.Close()
+	if err != nil {
+		fmt.Println(err)
+	}
+	for rows.Next() {
+		var name string
+		rows.Scan(&name)
+		fmt.Print(name + " ")
+	}
+	fmt.Println("")
+	tx.Commit()
+}
+
 func parseCommand(str string) {
 	args := strings.Split(str, " ")
 	if len(args) < 2 {
@@ -254,8 +282,11 @@ func parseCommand(str string) {
 			fmt.Println("Provide channel name")
 			break
 		}
-
-		findPerson(args[0])
+		if args[0] == "list" {
+			personsList()
+		} else {
+			findPerson(args[0])
+		}
 	}
 }
 
