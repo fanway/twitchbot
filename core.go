@@ -200,7 +200,7 @@ func findPerson(name string) {
 	if err != nil {
 		fmt.Println(err)
 	}
-
+	name = strings.ToLower(name)
 	fmt.Println("Currently watching: ")
 	for rows.Next() {
 		var toName string
