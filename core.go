@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -150,7 +149,6 @@ func findPerson(name string) {
 	if err != nil {
 		fmt.Println(err)
 	}
-
 	fmt.Println("New channels: ")
 	for rows.Next() {
 		var idx int
@@ -238,27 +236,27 @@ func findPerson(name string) {
 	fmt.Println("-----------------------")
 }
 
-func personsList() {
+func PersonsList(prefix string) []string {
 	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
 		fmt.Println(err)
-		return
 	}
 	defer tx.Rollback()
-	rows, err := tx.Query("SELECT DISTINCT FromName FROM Followers;")
+	rows, err := tx.Query("SELECT DISTINCT FromName FROM Followers WHERE FromName LIKE $1;", prefix)
 	defer rows.Close()
 	if err != nil {
 		fmt.Println(err)
 	}
+	var buffer []string
 	for rows.Next() {
-		var name string
-		rows.Scan(&name)
-		fmt.Print(name + " ")
+		var s string
+		rows.Scan(&s)
+		buffer = append(buffer, s)
 	}
-	fmt.Println("")
 	tx.Commit()
+	return buffer
 }
 
 func parseCommand(str string) {
@@ -283,7 +281,11 @@ func parseCommand(str string) {
 			break
 		}
 		if args[0] == "list" {
-			personsList()
+			rows := PersonsList("%")
+			for i := range rows {
+				fmt.Print(rows[i] + " ")
+			}
+			fmt.Println("")
 		} else {
 			findPerson(args[0])
 		}
@@ -291,10 +293,11 @@ func parseCommand(str string) {
 }
 
 func main() {
-	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		scanner.Scan()
-		args := scanner.Text()
-		parseCommand(args)
+		args, status := Console()
+		switch status {
+		case ENTER:
+			parseCommand(args)
+		}
 	}
 }
