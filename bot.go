@@ -158,41 +158,39 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 			break
 		}
 		// parsing chat
-		if strings.Contains(line, "PRIVMSG") {
-			userdata := strings.Split(line, ".tmi.twitch.tv PRIVMSG "+bot.Channel)
-			username := strings.Split(userdata[0], "@")[1]
-			emotes := strings.Split(strings.Split(userdata[0], "emotes=")[1], ";")[0]
-			usermessage := strings.Replace(userdata[1], " :", "", 1)
-			fmt.Fprintf(w, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05 -0700 MST"), username, usermessage)
-			w.Flush()
-			messageLength := len(usermessage)
-			if bot.Status == "smartvote" && messageLength == 1 {
-				if _, ok := bot.Utils.SmartVote.Options[usermessage]; ok {
-					if _, ok := bot.Utils.SmartVote.Votes[username]; !ok {
-						bot.Utils.SmartVote.Options[usermessage]++
-						bot.Utils.SmartVote.Votes[username] = usermessage
-					}
+		go bot.parseChat(line, w, pasteWriter)
+		defer wg.Done()
+	}
+}
+
+func (bot *Bot) parseChat(line string, w, pasteWriter *bufio.Writer) {
+	if strings.Contains(line, "PRIVMSG") {
+		userdata := strings.Split(line, ".tmi.twitch.tv PRIVMSG "+bot.Channel)
+		username := strings.Split(userdata[0], "@")[1]
+		emotes := strings.Split(strings.Split(userdata[0], "emotes=")[1], ";")[0]
+		usermessage := strings.Replace(userdata[1], " :", "", 1)
+		fmt.Fprintf(w, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05 -0700 MST"), username, usermessage)
+		w.Flush()
+		messageLength := len(usermessage)
+		if bot.Status == "smartvote" && messageLength == 1 {
+			if _, ok := bot.Utils.SmartVote.Options[usermessage]; ok {
+				if _, ok := bot.Utils.SmartVote.Votes[username]; !ok {
+					bot.Utils.SmartVote.Options[usermessage]++
+					bot.Utils.SmartVote.Votes[username] = usermessage
 				}
 			}
-			if messageLength >= 300 && messageLength <= 2000 {
-				fmt.Fprintf(pasteWriter, "%s\n\n", usermessage)
-			}
-
-			if bot.Authority[username] == "top" && usermessage[0:1] == "!" {
-				go bot.Commands(usermessage, username, emotes)
-			}
-		} else if strings.Contains(line, "PING") { // response to keep connection alive
-			bot.Pong(line)
-			fmt.Fprintln(w, line)
-			w.Flush()
 		}
-		/*
-			else {
-				fmt.Fprintln(w, line)
-				w.Flush()
-			}
-		*/
-		defer wg.Done()
+		if messageLength >= 300 && messageLength <= 2000 {
+			fmt.Fprintf(pasteWriter, "%s\n\n", usermessage)
+		}
+
+		if bot.Authority[username] == "top" && usermessage[0:1] == "!" {
+			go bot.Commands(usermessage, username, emotes)
+		}
+	} else if strings.Contains(line, "PING") { // response to keep connection alive
+		bot.Pong(line)
+		fmt.Fprintln(w, line)
+		w.Flush()
 	}
 }
 
