@@ -73,7 +73,7 @@ func Braille(img image.Image) string {
 				for x := 0; x < 2; x++ {
 					r, g, b, _ := img1.At(imgX+x, imgY+y).RGBA()
 					avg := (r + g + b) / (3 * 255)
-					if avg > 150 {
+					if avg > 128 {
 						if y != 3 {
 							curr |= currIdx << (x * 3)
 						} else {
@@ -85,7 +85,7 @@ func Braille(img image.Image) string {
 			}
 			output += string(0x2800 + curr)
 		}
-		output += "\n"
+		output += " "
 	}
 	return output
 }
