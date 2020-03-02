@@ -35,15 +35,16 @@ func setTerm() {
 	}
 }
 
-func processTab(str *string, buffer *[]string, tabCount *int) {
-	args := strings.Split(*str, " ")
+func processTab(state *string, buffer *[]string, tabCount *int) {
+	args := strings.Split(*state, " ")
 
 	command := args[0]
 	args = args[1:]
 
-	*str = command + " "
+	*state = command + " "
 	if len(*buffer) != 0 {
 		*tabCount = (*tabCount + 1) % len(*buffer)
+		*state += (*buffer)[*tabCount]
 		return
 	}
 	prefix := "%"
@@ -57,6 +58,8 @@ func processTab(str *string, buffer *[]string, tabCount *int) {
 		for i := range rows {
 			*buffer = append(*buffer, rows[i])
 		}
+
+		*state += (*buffer)[*tabCount]
 	}
 }
 
@@ -81,7 +84,6 @@ func Console() (string, int) {
 			return state, ENTER
 		case TAB:
 			processTab(&state, &buffer, &tabCount)
-			state += buffer[tabCount]
 		default:
 			state += string(ch)
 		}
