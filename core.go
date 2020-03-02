@@ -3,7 +3,9 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"image"
 	"net/http"
 	"os"
 	"strconv"
@@ -57,13 +59,17 @@ type ChatData struct {
 	} `json:"chatters"`
 }
 
-func requestJSON(req *http.Request, timeout int, obj interface{}) error {
+func RequestJSON(req *http.Request, timeout int, obj interface{}) error {
 	client := &http.Client{Timeout: time.Second * time.Duration(timeout)}
 	res, err := client.Do(req)
 	if err != nil {
 		return err
 	}
+	if res.StatusCode != http.StatusOK {
+		return errors.New("HTTP status:" + strconv.Itoa(res.StatusCode))
+	}
 	decoder := json.NewDecoder(res.Body)
+	decoder.UseNumber()
 	err = decoder.Decode(&obj)
 	if err != nil {
 		return err
@@ -71,7 +77,7 @@ func requestJSON(req *http.Request, timeout int, obj interface{}) error {
 	return nil
 }
 
-func connectDb() *sql.DB {
+func ConnectDb() *sql.DB {
 	db, err := sql.Open("sqlite3", "./data.db?_busy_timeout=5000&cache=shared&mode=rwc")
 	if err != nil {
 		panic(err)
@@ -81,7 +87,7 @@ func connectDb() *sql.DB {
 }
 
 func findPerson(name string) {
-	db := connectDb()
+	db := ConnectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -97,7 +103,7 @@ func findPerson(name string) {
 		req, _ := http.NewRequest("GET", url, nil)
 		req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
 		var iddata IdData
-		err := requestJSON(req, 10, &iddata)
+		err := RequestJSON(req, 10, &iddata)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -108,7 +114,7 @@ func findPerson(name string) {
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 	var followers Followers
-	err = requestJSON(req, 10, &followers)
+	err = RequestJSON(req, 10, &followers)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -119,7 +125,7 @@ func findPerson(name string) {
 		req, _ = http.NewRequest("GET", url, nil)
 		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 		var temp Followers
-		err = requestJSON(req, 10, &temp)
+		err = RequestJSON(req, 10, &temp)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -206,7 +212,7 @@ func findPerson(name string) {
 		url = "https://tmi.twitch.tv/group/user/" + strings.ToLower(toName) + "/chatters"
 		req, _ := http.NewRequest("GET", url, nil)
 		var chatData ChatData
-		err = requestJSON(req, 10, &chatData)
+		err = RequestJSON(req, 10, &chatData)
 		if err != nil {
 			//fmt.Println(err)
 			continue
@@ -237,7 +243,7 @@ func findPerson(name string) {
 }
 
 func PersonsList(prefix string) []string {
-	db := connectDb()
+	db := ConnectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -257,6 +263,24 @@ func PersonsList(prefix string) []string {
 	}
 	tx.Commit()
 	return buffer
+}
+
+func AsciifyRequest(url string) string {
+	client := &http.Client{}
+	//url := "http://static-cdn.jtvnw.net/emoticons/v1/" + args[0] + "/3.0"
+	req, _ := http.NewRequest("GET", url, nil)
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(res)
+	}
+	defer res.Body.Close()
+
+	img, _, err := image.Decode(res.Body)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return Braille(img)
 }
 
 func parseCommand(str string) {
@@ -289,6 +313,8 @@ func parseCommand(str string) {
 		} else {
 			findPerson(args[0])
 		}
+	case "asciify":
+		//fmt.Println(asciify(args))
 	}
 }
 
