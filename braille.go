@@ -1,23 +1,37 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"image"
 	_ "image/png"
-	"log"
-	"os"
 )
 
-func Braille() {
-	reader, err := os.Open("4H.png")
+func EmoteCache(url string) string {
+	db := ConnectDb()
+	defer db.Close()
+	tx, err := db.Begin()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
 	}
-	defer reader.Close()
-	img, _, err := image.Decode(reader)
+	defer tx.Rollback()
+	_, err = tx.Exec("CREATE TABLE IF NOT EXISTS emoteCache(url TEXT NOT NULL,image TEXT NOT NULL, UNIQUE (url) ON CONFLICT REPLACE);")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
 	}
+	var str string
+	if err := tx.QueryRow("SELECT image FROM emoteCache WHERE url=$1;", url).Scan(&str); err == sql.ErrNoRows {
+		str = AsciifyRequest(url)
+		_, err = tx.Exec("INSERT INTO emoteCache(url, image) VALUES($1,$2);", url, str)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	tx.Commit()
+	return str
+}
+
+func Braille(img image.Image) string {
 	b := img.Bounds()
 	maxW := 30
 	imageWidth := b.Max.X
@@ -73,6 +87,5 @@ func Braille() {
 		}
 		output += "\n"
 	}
-
-	fmt.Println(output)
+	return output
 }
