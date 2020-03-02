@@ -7,8 +7,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"net/textproto"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +38,83 @@ type Bot struct {
 	Utils     Utils
 }
 
+type Bttv struct {
+	ID            string   `json:"id"`
+	Bots          []string `json:"bots"`
+	ChannelEmotes []struct {
+		ID        string `json:"id"`
+		Code      string `json:"code"`
+		ImageType string `json:"imageType"`
+		UserID    string `json:"userId"`
+	} `json:"channelEmotes"`
+	SharedEmotes []struct {
+		ID        string `json:"id"`
+		Code      string `json:"code"`
+		ImageType string `json:"imageType"`
+		User      struct {
+			ID          string `json:"id"`
+			Name        string `json:"name"`
+			DisplayName string `json:"displayName"`
+			ProviderID  string `json:"providerId"`
+		} `json:"user"`
+	} `json:"sharedEmotes"`
+}
+
+type Ffz struct {
+	Room struct {
+		_ID            int         `json:"_id"`
+		CSS            interface{} `json:"css"`
+		DisplayName    string      `json:"display_name"`
+		ID             string      `json:"id"`
+		IsGroup        bool        `json:"is_group"`
+		ModUrls        interface{} `json:"mod_urls"`
+		ModeratorBadge interface{} `json:"moderator_badge"`
+		Set            int         `json:"set"`
+		TwitchID       int         `json:"twitch_id"`
+		UserBadges     struct {
+		} `json:"user_badges"`
+	} `json:"room"`
+	Sets struct {
+		IDX struct {
+			Type        int         `json:"_type"`
+			CSS         interface{} `json:"css"`
+			Description interface{} `json:"description"`
+			Emoticons   []struct {
+				CSS      interface{} `json:"css"`
+				Height   int         `json:"height"`
+				Hidden   bool        `json:"hidden"`
+				ID       int         `json:"id"`
+				Margins  interface{} `json:"margins"`
+				Modifier bool        `json:"modifier"`
+				Name     string      `json:"name"`
+				Offset   interface{} `json:"offset"`
+				Owner    struct {
+					ID          int    `json:"_id"`
+					DisplayName string `json:"display_name"`
+					Name        string `json:"name"`
+				} `json:"owner"`
+				Public bool `json:"public"`
+				Urls   struct {
+					One  string `json:"1,omitempty"`
+					Two  string `json:"2,omitempty"`
+					Four string `json:"4,omitempty"`
+				} `json:"urls,omitempty"`
+				Width int `json:"width"`
+			} `json:"emoticons"`
+			Icon  interface{} `json:"icon"`
+			ID    int         `json:"id"`
+			Title string      `json:"title"`
+		} `json:`
+	} `json:"sets"`
+}
+
+type bttvGlobal []struct {
+	ID        string `json:"id"`
+	Code      string `json:"code"`
+	ImageType string `json:"imageType"`
+	UserID    string `json:"userId"`
+}
+
 // connects to twitch chat
 func (bot *Bot) Connect(wg *sync.WaitGroup) {
 	var err error
@@ -44,16 +123,22 @@ func (bot *Bot) Connect(wg *sync.WaitGroup) {
 		fmt.Printf("Unable to connect!")
 	}
 	fmt.Printf("connected to %s\n", bot.Channel)
+	fmt.Fprintf(bot.Conn, "CAP REQ :twitch.tv/tags\r\n")
 	fmt.Fprintf(bot.Conn, "PASS %s\r\n", bot.OAuth)
 	fmt.Fprintf(bot.Conn, "NICK %s\r\n", bot.Name)
 	fmt.Fprintf(bot.Conn, "JOIN %s\r\n", bot.Channel)
 	wg.Add(1)
+	go bot.ffzBttvInit()
 	go bot.reader(wg)
 }
 
 func (bot *Bot) Pong(line string) {
 	pong := strings.Split(line, "PING")
 	fmt.Fprintf(bot.Conn, "PONG %s\r\n", pong[1])
+}
+
+func (bot *Bot) SendMessage(msg string) {
+	fmt.Fprintf(bot.Conn, "PRIVMSG %s :%s\r\n", bot.Channel, msg)
 }
 
 // reader and parser
@@ -67,6 +152,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 	pasteWriter := bufio.NewWriter(pasteFile)
 	for {
 		line, err := tp.ReadLine()
+		line = line[1:]
 		if err != nil {
 			fmt.Println(err)
 			break
@@ -75,6 +161,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 		if strings.Contains(line, "PRIVMSG") {
 			userdata := strings.Split(line, ".tmi.twitch.tv PRIVMSG "+bot.Channel)
 			username := strings.Split(userdata[0], "@")[1]
+			emotes := strings.Split(strings.Split(userdata[0], "emotes=")[1], ";")[0]
 			usermessage := strings.Replace(userdata[1], " :", "", 1)
 			fmt.Fprintf(w, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05 -0700 MST"), username, usermessage)
 			w.Flush()
@@ -92,7 +179,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 			}
 
 			if bot.Authority[username] == "top" && usermessage[0:1] == "!" {
-				go bot.Commands(usermessage, username)
+				go bot.Commands(usermessage, username, emotes)
 			}
 		} else if strings.Contains(line, "PING") { // response to keep connection alive
 			bot.Pong(line)
@@ -110,7 +197,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 }
 
 // chat commands
-func (bot *Bot) Commands(command string, username string) {
+func (bot *Bot) Commands(command string, username string, emotes string) {
 	var cmd Command
 	var err error
 	err = cmd.Parse(command)
@@ -127,6 +214,12 @@ func (bot *Bot) Commands(command string, username string) {
 	// !stopvote
 	case "stopvote":
 		bot.Status = "Running"
+	case "asciify":
+		if len(emotes) > 0 {
+			err = bot.Asciify(strings.Split(emotes, ":")[0], "twitch")
+		} else {
+			err = bot.Asciify(cmd.Params, "ffzbttv")
+		}
 	}
 	if err != nil {
 		bot.Status = "Running"
@@ -144,6 +237,87 @@ func authorityInit() map[string]string {
 		fmt.Println(err)
 	}
 	return m
+}
+
+func (bot *Bot) ffzBttvInit() {
+	db := ConnectDb()
+	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("CREATE TABLE IF NOT EXISTS ffzbttv(url TEXT NOT NULL, code TEXT NOT NULL, UNIQUE (url) ON CONFLICT REPLACE);")
+	if err != nil {
+		fmt.Println(err)
+	}
+	ffzUrl := "https://api.frankerfacez.com/v1/room/" + bot.Channel[1:]
+	var ffz map[string]interface{}
+	req, _ := http.NewRequest("GET", ffzUrl, nil)
+	err = RequestJSON(req, 10, &ffz)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(ffz)
+	room := ffz["room"].(map[string]interface{})
+	fmt.Println(room["twitch_id"])
+	twitchID, _ := room["twitch_id"].(json.Number).Int64()
+	set := room["set"].(json.Number).String()
+	sets := ffz["sets"].(map[string]interface{})[set].(map[string]interface{})["emoticons"].([]interface{})
+
+	var s string
+	for i := range sets {
+		urls := sets[i].(map[string]interface{})["urls"].(map[string]interface{})
+		name := sets[i].(map[string]interface{})["name"].(string)
+		if val, ok := urls["4"]; ok {
+			s = val.(string)
+		} else if val, ok = urls["2"]; ok {
+			s = val.(string)
+		} else if val, ok = urls["1"]; ok {
+			s = val.(string)
+		}
+		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", "https:"+s, name)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	bttvUrl := "https://api.betterttv.net/3/cached/users/twitch/" + strconv.FormatInt(twitchID, 10)
+	var bttv Bttv
+	req, _ = http.NewRequest("GET", bttvUrl, nil)
+	err = RequestJSON(req, 10, &bttv)
+	if err != nil {
+		fmt.Println(err)
+	}
+	cdnUrl := "https://cdn.betterttv.net/emote/"
+	for _, u := range bttv.SharedEmotes {
+		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	for _, u := range bttv.SharedEmotes {
+		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	ttvUrl := "https://api.betterttv.net/3/cached/emotes/global"
+	var bttvglobal bttvGlobal
+	req, _ = http.NewRequest("GET", ttvUrl, nil)
+	err = RequestJSON(req, 10, &bttvglobal)
+	if err != nil {
+		fmt.Println(err)
+	}
+	for _, u := range bttvglobal {
+		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	tx.Commit()
 }
 
 func StartBot(channel string) {
