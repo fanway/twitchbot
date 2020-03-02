@@ -200,10 +200,10 @@ func (bot *Bot) Commands(command string, username string, emotes string) {
 	var err error
 	err = cmd.Parse(command)
 	switch cmd.Name {
-	// !logs(username, timeStart, timeEnd)
+	// !logs username, timeStart, timeEnd
 	case "logs":
 		err = bot.LogsCommand(cmd.Params)
-	// !smartvote(lowerBound, upperBound)
+	// !smartvote lowerBound, upperBound
 	case "smartvote":
 		err = bot.SmartVoteCommand(cmd.Params)
 	// !voteoptions
@@ -212,6 +212,7 @@ func (bot *Bot) Commands(command string, username string, emotes string) {
 	// !stopvote
 	case "stopvote":
 		bot.Status = "Running"
+	// !asciify <emote>
 	case "asciify":
 		if len(emotes) > 0 {
 			err = bot.Asciify(strings.Split(emotes, ":")[0], "twitch")
