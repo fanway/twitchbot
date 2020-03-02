@@ -77,18 +77,17 @@ func (bot *Bot) SmartVoteCommand(params string) error {
 	bot.Utils.SmartVote.Options = make(map[string]int)
 	bot.Utils.SmartVote.Votes = make(map[string]string)
 	bot.Status = "smartvote"
-	split := strings.Split(params, ",")
+	split := strings.Split(params, "-")
 	if len(split) < 2 {
 		return errors.New("!smartvote: not enough args")
 	}
 	str := "GOLOSOVANIE"
 	bot.SendMessage(str)
-	r := strings.Split(split[1], "-")
-	lowerBound, err := strconv.Atoi(r[0])
+	lowerBound, err := strconv.Atoi(split[0])
 	if err != nil {
 		return err
 	}
-	upperBound, err := strconv.Atoi(r[1])
+	upperBound, err := strconv.Atoi(split[1])
 	if err != nil {
 		return err
 	}
@@ -100,6 +99,9 @@ func (bot *Bot) SmartVoteCommand(params string) error {
 }
 
 func (bot *Bot) VoteOptionsCommand() error {
+	if bot.Status != "smartvote" {
+		return errors.New("There is not any vote")
+	}
 	length := len(bot.Utils.SmartVote.Options)
 	keys := make([]string, length)
 	i := 0
@@ -110,6 +112,7 @@ func (bot *Bot) VoteOptionsCommand() error {
 	sort.Strings(keys)
 	var str string
 	total := len(bot.Utils.SmartVote.Votes)
+	fmt.Println(total)
 	str = fmt.Sprintf("Total votes %d: ", total)
 	percent := float32(bot.Utils.SmartVote.Options[keys[0]]) / float32(total) * 100
 	str += fmt.Sprintf("%s: %.1f%%(%d)", keys[0], percent, bot.Utils.SmartVote.Options[keys[0]])
