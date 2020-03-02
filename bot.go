@@ -304,19 +304,6 @@ func (bot *Bot) ffzBttvInit() {
 			fmt.Println(err)
 		}
 	}
-	ttvUrl := "https://api.betterttv.net/3/cached/emotes/global"
-	var bttvglobal bttvGlobal
-	req, _ = http.NewRequest("GET", ttvUrl, nil)
-	err = RequestJSON(req, 10, &bttvglobal)
-	if err != nil {
-		fmt.Println(err)
-	}
-	for _, u := range bttvglobal {
-		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
 	tx.Commit()
 }
 
