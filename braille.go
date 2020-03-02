@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
@@ -53,12 +54,23 @@ func Braille(img image.Image) string {
 	hRatio := float32(imageHeight) / float32(h)
 	wRatio := float32(imageWidth) / float32(w)
 
+	var th uint32
+
 	for x := 0; x < w; x++ {
 		for y := 0; y < h; y++ {
-			p := img.At(int(float32(x)*wRatio), int(float32(y)*hRatio))
-			img1.Set(x, y, p)
+			r, g, b, _ := img.At(int(float32(x)*wRatio), int(float32(y)*hRatio)).RGBA()
+			r = uint32(0.299 * float32(r))
+			g = uint32(0.587 * float32(g))
+			b = uint32(0.114 * float32(b))
+			rgb := (r + g + b) >> 8
+			th += rgb
+			img1.Set(x, y, color.Gray{uint8(rgb)})
 		}
 	}
+
+	th /= uint32(w * h)
+
+	fmt.Println(th)
 
 	output := ""
 	for imgY := 0; imgY < h; imgY += 4 {
@@ -71,8 +83,8 @@ func Braille(img image.Image) string {
 				}
 				for x := 0; x < 2; x++ {
 					r, g, b, _ := img1.At(imgX+x, imgY+y).RGBA()
-					avg := (r + g + b) / (3 * 255)
-					if avg > 128 {
+					score := (r + g + b) / (3 * 256)
+					if score > th {
 						if y != 3 {
 							curr |= currIdx << (x * 3)
 						} else {

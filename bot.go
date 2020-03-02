@@ -152,7 +152,6 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 	pasteWriter := bufio.NewWriter(pasteFile)
 	for {
 		line, err := tp.ReadLine()
-		line = line[1:]
 		if err != nil {
 			fmt.Println(err)
 			break
@@ -165,6 +164,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 
 func (bot *Bot) parseChat(line string, w, pasteWriter *bufio.Writer) {
 	if strings.Contains(line, "PRIVMSG") {
+		line := line[1:]
 		userdata := strings.Split(line, ".tmi.twitch.tv PRIVMSG "+bot.Channel)
 		username := strings.Split(userdata[0], "@")[1]
 		emotes := strings.Split(strings.Split(userdata[0], "emotes=")[1], ";")[0]
@@ -259,9 +259,7 @@ func (bot *Bot) ffzBttvInit() {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(ffz)
 	room := ffz["room"].(map[string]interface{})
-	fmt.Println(room["twitch_id"])
 	twitchID, _ := room["twitch_id"].(json.Number).Int64()
 	set := room["set"].(json.Number).String()
 	sets := ffz["sets"].(map[string]interface{})[set].(map[string]interface{})["emoticons"].([]interface{})
