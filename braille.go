@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"image"
+	_ "image/gif"
+	_ "image/jpeg"
 	_ "image/png"
 )
 
@@ -45,14 +47,11 @@ func Braille(img image.Image) string {
 		w = imageWidth
 		h = imageHeight
 	}
-	fmt.Println(w, h)
-
 	rect := image.Rect(0, 0, w, h)
 	img1 := image.NewRGBA(rect)
 
 	hRatio := float32(imageHeight) / float32(h)
 	wRatio := float32(imageWidth) / float32(w)
-	fmt.Println(hRatio, wRatio)
 
 	for x := 0; x < w; x++ {
 		for y := 0; y < h; y++ {
