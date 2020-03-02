@@ -17,13 +17,14 @@ type Command struct {
 }
 
 func (cmd *Command) Parse(message string) error {
-	startIdx := strings.Index(message, "(")
-	endIdx := strings.Index(message, ")")
-	if startIdx == -1 || endIdx == -1 {
+	args := strings.Split(message, " ")
+	if args[0] == "!" {
 		return errors.New("could not parse command")
 	}
-	cmd.Name = message[1:startIdx]
-	cmd.Params = message[startIdx+1 : endIdx]
+	cmd.Name = args[0][1:]
+	if len(args) > 1 {
+		cmd.Params = args[1]
+	}
 	return nil
 }
 
@@ -60,7 +61,7 @@ func (bot *Bot) LogsCommand(params string) error {
 			if timeq.Before(timeEnd) && timeq.After(timeStart) {
 				if strings.Count(str, ":") > 2 {
 					if strings.Contains(strings.Split(str, ":")[2], username) || username == "all" {
-						fmt.Fprintf(bot.Conn, "PRIVMSG %s :%s\r\n", bot.Channel, str)
+						bot.SendMessage(str)
 					}
 				}
 			}
@@ -81,7 +82,7 @@ func (bot *Bot) SmartVoteCommand(params string) error {
 		return errors.New("!smartvote: not enough args")
 	}
 	str := "GOLOSOVANIE"
-	fmt.Fprintf(bot.Conn, "PRIVMSG %s :%s\r\n", bot.Channel, str)
+	bot.SendMessage(str)
 	r := strings.Split(split[1], "-")
 	lowerBound, err := strconv.Atoi(r[0])
 	if err != nil {
@@ -116,6 +117,40 @@ func (bot *Bot) VoteOptionsCommand() error {
 		percent = float32(bot.Utils.SmartVote.Options[keys[i]]) / float32(total) * 100
 		str += fmt.Sprintf(", %s: %.1f%%(%d)", keys[i], percent, bot.Utils.SmartVote.Options[keys[i]])
 	}
-	fmt.Fprintf(bot.Conn, "PRIVMSG %s :%s\r\n", bot.Channel, str)
+	bot.SendMessage(str)
+	return nil
+}
+
+func FfzBttv(emote string) (string, error) {
+	db := ConnectDb()
+	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer tx.Rollback()
+
+	var str string
+	if err := tx.QueryRow("SELECT url FROM ffzbttv WHERE code=$1;", emote).Scan(&str); err != nil {
+		return "", err
+	}
+
+	return str, nil
+
+}
+
+func (bot *Bot) Asciify(emote string, state string) error {
+	var url string
+	var err error
+	switch state {
+	case "twitch":
+		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + emote + "/3.0"
+	case "ffzbttv":
+		url, err = FfzBttv(emote)
+		if err != nil {
+			return err
+		}
+	}
+	bot.SendMessage(EmoteCache(url))
 	return nil
 }
