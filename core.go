@@ -319,8 +319,10 @@ func parseCommand(str string) {
 }
 
 func main() {
+	var arrowBuffer []string
+	var arrowCount int
 	for {
-		args, status := Console()
+		args, status := Console(&arrowBuffer, &arrowCount)
 		switch status {
 		case ENTER:
 			parseCommand(args)

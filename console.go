@@ -9,10 +9,20 @@ import (
 )
 
 const (
-	TAB       = 9
-	ENTER     = 10
-	BACKSPACE = 127
+	TAB        = 9
+	ENTER      = 10
+	BACKSPACE  = 127
+	ESC        = 27
+	ARROW_UP   = "\033[A"
+	ARROW_DOWN = "\033[B"
 )
+
+func Abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
 
 func getChar(f *os.File) byte {
 	bs := make([]byte, 1, 1)
@@ -63,7 +73,7 @@ func processTab(state *string, buffer *[]string, tabCount *int) {
 	}
 }
 
-func Console() (string, int) {
+func Console(arrowBuffer *[]string, arrowCount *int) (string, int) {
 	var state string
 	var buffer []string
 	var tabCount int
@@ -80,10 +90,35 @@ func Console() (string, int) {
 			buffer = buffer[:0]
 			tabCount = 0
 		case ENTER:
+			*arrowBuffer = append(*arrowBuffer, state)
+			*arrowCount = len(*arrowBuffer)
 			fmt.Println("")
 			return state, ENTER
 		case TAB:
 			processTab(&state, &buffer, &tabCount)
+		case ESC:
+			tempFirst := getChar(os.Stdin)
+			if tempFirst == '[' {
+				if len(*arrowBuffer) == 0 {
+					break
+				}
+				tempSecond := getChar(os.Stdin)
+				if tempSecond == 'A' {
+					if *arrowCount != 0 {
+						*arrowCount--
+						state = (*arrowBuffer)[*arrowCount]
+					}
+				} else if tempSecond == 'B' {
+					if *arrowCount == len(*arrowBuffer)-1 {
+						state = ""
+					} else {
+						*arrowCount++
+						state = (*arrowBuffer)[*arrowCount]
+					}
+				}
+			} else {
+				state += string(tempFirst)
+			}
 		default:
 			state += string(ch)
 		}
