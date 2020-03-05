@@ -283,7 +283,7 @@ func AsciifyRequest(url string) string {
 	return Braille(img)
 }
 
-func parseCommand(str string) {
+func parseCommand(str string, botInstances map[string]*Bot) {
 	args := strings.Split(str, " ")
 	if len(args) < 2 {
 		fmt.Println("Not enough args")
@@ -298,7 +298,7 @@ func parseCommand(str string) {
 			fmt.Println("Provide channel name")
 			break
 		}
-		go StartBot(args[0])
+		go StartBot(args[0], botInstances)
 	case "find":
 		if len(args) != 1 {
 			fmt.Println("Provide channel name")
@@ -315,17 +315,25 @@ func parseCommand(str string) {
 		}
 	case "asciify":
 		//fmt.Println(asciify(args))
+	case "disconnect":
+		if len(args) != 1 {
+			fmt.Println("Provide channel name")
+			break
+		}
+		delete(botInstances, args[0])
+
 	}
 }
 
 func main() {
 	var arrowBuffer []string
 	var arrowCount int
+	botInstaces := make(map[string]*Bot)
 	for {
 		args, status := Console(&arrowBuffer, &arrowCount)
 		switch status {
 		case ENTER:
-			parseCommand(args)
+			parseCommand(args, botInstaces)
 		}
 	}
 }

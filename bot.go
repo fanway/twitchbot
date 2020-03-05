@@ -184,7 +184,7 @@ func (bot *Bot) parseChat(line string, w, pasteWriter *bufio.Writer) {
 			fmt.Fprintf(pasteWriter, "%s\n\n", usermessage)
 		}
 
-		if bot.Authority[username] == "top" && usermessage[0:1] == "!" {
+		if usermessage[0:1] == "!" {
 			go bot.Commands(usermessage, username, emotes)
 		}
 	} else if strings.Contains(line, "PING") { // response to keep connection alive
@@ -199,25 +199,32 @@ func (bot *Bot) Commands(command string, username string, emotes string) {
 	var cmd Command
 	var err error
 	err = cmd.Parse(command)
-	switch cmd.Name {
-	// !logs username, timeStart, timeEnd
-	case "logs":
-		err = bot.LogsCommand(cmd.Params)
-	// !smartvote lowerBound, upperBound
-	case "smartvote":
-		err = bot.SmartVoteCommand(cmd.Params)
-	// !voteoptions
-	case "voteoptions":
-		err = bot.VoteOptionsCommand()
-	// !stopvote
-	case "stopvote":
-		bot.Status = "Running"
-	// !asciify <emote>
-	case "asciify":
-		if len(emotes) > 0 {
-			err = bot.Asciify(strings.Split(emotes, ":")[0], "twitch")
-		} else {
-			err = bot.Asciify(cmd.Params, "ffzbttv")
+	switch bot.Authority[username] {
+	case "top":
+		switch cmd.Name {
+		// !logs username, timeStart, timeEnd
+		case "logs":
+			err = bot.LogsCommand(cmd.Params)
+		// !smartvote lowerBound, upperBound
+		case "smartvote":
+			err = bot.SmartVoteCommand(cmd.Params)
+		// !stopvote
+		case "stopvote":
+			bot.Status = "Running"
+		}
+		fallthrough
+	case "middle":
+		switch cmd.Name {
+		// !voteoptions
+		case "voteoptions":
+			err = bot.VoteOptionsCommand()
+		// !asciify <emote>
+		case "asciify":
+			if len(emotes) > 0 {
+				err = bot.Asciify(strings.Split(emotes, ":")[0], "twitch")
+			} else {
+				err = bot.Asciify(cmd.Params, "ffzbttv")
+			}
 		}
 	}
 	if err != nil {
@@ -304,7 +311,7 @@ func (bot *Bot) ffzBttvInit() {
 	tx.Commit()
 }
 
-func StartBot(channel string) {
+func StartBot(channel string, botInstances map[string]*Bot) {
 	wg := new(sync.WaitGroup)
 	logfile, err := os.OpenFile(channel+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
@@ -322,6 +329,7 @@ func StartBot(channel string) {
 		Conn:      nil,
 		Authority: m,
 	}
+	botInstances[channel] = &bot
 	bot.Connect(wg)
 	wg.Wait()
 }
