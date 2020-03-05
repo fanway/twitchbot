@@ -77,15 +77,25 @@ func Console(arrowBuffer *[]string, arrowCount *int) (string, int) {
 	var state string
 	var buffer []string
 	var tabCount int
+	var arrowPointer int
+	var arrowState string
 	setTerm()
 	for {
 		// \033[H
-		fmt.Print("\033[2K\r" + state)
+		fmt.Print("\033[2K\r" + state + arrowState)
 		ch := getChar(os.Stdin)
 		switch ch {
 		case BACKSPACE:
 			if len(state) > 0 {
-				state = state[:len(state)-1]
+				n := len(state) - arrowPointer - 1
+				if n >= 0 {
+					state = state[:n] + state[n+1:]
+					arrowState = ""
+					// TODO: rethink this part
+					for i := 0; i < arrowPointer; i++ {
+						arrowState += "\033[D"
+					}
+				}
 			}
 			buffer = buffer[:0]
 			tabCount = 0
@@ -99,28 +109,38 @@ func Console(arrowBuffer *[]string, arrowCount *int) (string, int) {
 		case ESC:
 			tempFirst := getChar(os.Stdin)
 			if tempFirst == '[' {
-				if len(*arrowBuffer) == 0 {
-					break
-				}
 				tempSecond := getChar(os.Stdin)
-				if tempSecond == 'A' {
+				if tempSecond == 'A' && len(*arrowBuffer) > 0 {
+					//up
 					if *arrowCount != 0 {
 						*arrowCount--
 						state = (*arrowBuffer)[*arrowCount]
 					}
-				} else if tempSecond == 'B' {
+				} else if tempSecond == 'B' && len(*arrowBuffer) > 0 {
+					//down
 					if *arrowCount == len(*arrowBuffer)-1 {
 						state = ""
 					} else {
 						*arrowCount++
 						state = (*arrowBuffer)[*arrowCount]
 					}
+				} else if tempSecond == 'D' && arrowPointer < len(state) {
+					//left
+					arrowPointer++
+					fmt.Println(len(state), arrowPointer)
+					arrowState += "\033[D"
+				} else if tempSecond == 'C' && arrowPointer > 0 {
+					//right
+					arrowPointer--
+					fmt.Println(len(state), arrowPointer)
+					arrowState += "\033[C"
 				}
 			} else {
 				state += string(tempFirst)
 			}
 		default:
-			state += string(ch)
+			n := len(state) - arrowPointer - 1
+			state = state[:n+1] + string(ch) + state[n+1:]
 		}
 	}
 }
