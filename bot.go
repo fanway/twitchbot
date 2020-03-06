@@ -146,11 +146,6 @@ func (bot *Bot) SendMessage(msg string) {
 func (bot *Bot) reader(wg *sync.WaitGroup) {
 	tp := textproto.NewReader(bufio.NewReader(bot.Conn))
 	w := bufio.NewWriter(bot.File)
-	pasteFile, err := os.OpenFile("paste.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		fmt.Println(err)
-	}
-	pasteWriter := bufio.NewWriter(pasteFile)
 	for {
 		line, err := tp.ReadLine()
 		if err != nil {
@@ -158,12 +153,12 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 			break
 		}
 		// parsing chat
-		go bot.parseChat(line, w, pasteWriter)
+		go bot.parseChat(line, w)
 		defer wg.Done()
 	}
 }
 
-func (bot *Bot) parseChat(line string, w, pasteWriter *bufio.Writer) {
+func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 	if strings.Contains(line, "PRIVMSG") {
 		line := line[1:]
 		userdata := strings.Split(line, ".tmi.twitch.tv PRIVMSG "+bot.Channel)
@@ -182,6 +177,11 @@ func (bot *Bot) parseChat(line string, w, pasteWriter *bufio.Writer) {
 			}
 		}
 		if messageLength >= 300 && messageLength <= 2000 {
+			pasteFile, err := os.OpenFile("paste.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+			if err != nil {
+				fmt.Println(err)
+			}
+			pasteWriter := bufio.NewWriter(pasteFile)
 			fmt.Fprintf(pasteWriter, "%s\n\n", usermessage)
 		}
 
