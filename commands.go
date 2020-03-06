@@ -31,7 +31,10 @@ func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error
 		}
 		if cmd.Name == "asciify" {
 			width := ""
-			if len(cmd.Params) > 1 && level >= TOP {
+			if len(cmd.Params) > 1 {
+				if level < TOP {
+					return nil, errors.New("!asciify: Not enough rights to change width")
+				}
 				width = cmd.Params[1]
 			}
 
@@ -60,43 +63,38 @@ func (bot *Bot) initCommands() {
 	bot.Commands = map[string]*Command{
 		// !logs username, timeStart, timeEnd
 		"logs": &Command{
-			Name:      "logs",
-			Cd:        60,
-			LastUsage: time.Now(),
-			Level:     TOP,
-			Handler:   bot.LogsCommand,
+			Name:    "logs",
+			Cd:      60,
+			Level:   TOP,
+			Handler: bot.LogsCommand,
 		},
 		// !smartvote lowerBound, upperBound
 		"smartvote": &Command{
-			Name:      "smartvote",
-			Cd:        30,
-			LastUsage: time.Now(),
-			Level:     TOP,
-			Handler:   bot.SmartVoteCommand,
+			Name:    "smartvote",
+			Cd:      30,
+			Level:   TOP,
+			Handler: bot.SmartVoteCommand,
 		},
 		// !stopvote
 		"stopvote": &Command{
-			Name:      "stopvote",
-			Cd:        15,
-			LastUsage: time.Now(),
-			Level:     TOP,
-			Handler:   bot.StopVoteCommand,
+			Name:    "stopvote",
+			Cd:      15,
+			Level:   TOP,
+			Handler: bot.StopVoteCommand,
 		},
 		// !voteoptions
 		"voteoptions": &Command{
-			Name:      "voteoptions",
-			Cd:        5,
-			LastUsage: time.Now(),
-			Level:     MIDDLE,
-			Handler:   bot.VoteOptionsCommand,
+			Name:    "voteoptions",
+			Cd:      5,
+			Level:   MIDDLE,
+			Handler: bot.VoteOptionsCommand,
 		},
 		// !asciify <emote>
 		"asciify": &Command{
-			Name:      "asciify",
-			Cd:        10,
-			LastUsage: time.Now(),
-			Level:     MIDDLE,
-			Handler:   bot.Asciify,
+			Name:    "asciify",
+			Cd:      10,
+			Level:   MIDDLE,
+			Handler: bot.Asciify,
 		},
 	}
 }
@@ -119,7 +117,7 @@ func (bot *Bot) Cooldown(command string, level int) error {
 
 	t := time.Since(bot.Commands[command].LastUsage)
 
-	if int(t) >= bot.Commands[command].Cd {
+	if t >= time.Duration(bot.Commands[command].Cd)*time.Second {
 		bot.Commands[command].LastUsage = time.Now()
 		return nil
 	} else {

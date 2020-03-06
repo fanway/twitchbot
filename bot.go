@@ -211,11 +211,13 @@ func (bot *Bot) processCommands(command string, username string, emotes string) 
 	if err != nil {
 		bot.Status = "Running"
 		fmt.Println(err)
+		return
 	}
 	err = cmd.ExecCommand(level)
 	if err != nil {
 		bot.Status = "Running"
 		fmt.Println(err)
+		return
 	}
 }
 
