@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -218,18 +219,22 @@ func (bot *Bot) Commands(command string, username string, emotes string) {
 		// !voteoptions
 		case "voteoptions":
 			err = bot.VoteOptionsCommand()
-		// !asciify <emote>
+		// !asciify <emote> TODO: move it to commands.go amd refactor whole pipeline
 		case "asciify":
-			split := strings.Split(cmd.Params, ",")
 			width := ""
-			if len(split) > 1 {
-				width = split[1]
+			if len(cmd.Params) > 1 {
+				width = cmd.Params[1]
+			}
+
+			if cmd.Params == nil {
+				err = errors.New("!asciify: need emote")
+				break
 			}
 
 			if len(emotes) > 0 {
 				err = bot.Asciify(strings.Split(emotes, ":")[0], "twitch", width)
 			} else {
-				err = bot.Asciify(split[0], "ffzbttv", width)
+				err = bot.Asciify(cmd.Params[0], "ffzbttv", width)
 			}
 		}
 	}

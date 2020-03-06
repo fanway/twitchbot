@@ -13,7 +13,7 @@ import (
 
 type Command struct {
 	Name   string
-	Params string
+	Params []string
 }
 
 func (cmd *Command) Parse(message string) error {
@@ -23,14 +23,17 @@ func (cmd *Command) Parse(message string) error {
 	}
 	cmd.Name = args[0][1:]
 	if len(args) > 1 {
-		cmd.Params = args[1]
+		cmd.Params = args[1:]
 	}
 	return nil
 }
 
-func (bot *Bot) LogsCommand(params string) error {
+func (bot *Bot) LogsCommand(params []string) error {
+	if params == nil {
+		return errors.New("!logs: not enough params")
+	}
 	// username, timeStart, timeEnd (utt)
-	utt := strings.Split(params, ",")
+	utt := strings.Split(params[0], ",")
 	if len(utt) < 3 {
 		return errors.New("!logs: wrong amount of params")
 	}
@@ -73,11 +76,14 @@ func (bot *Bot) LogsCommand(params string) error {
 	return nil
 }
 
-func (bot *Bot) SmartVoteCommand(params string) error {
+func (bot *Bot) SmartVoteCommand(params []string) error {
+	if params == nil {
+		return errors.New("!smartvote: not enough params")
+	}
 	bot.Utils.SmartVote.Options = make(map[string]int)
 	bot.Utils.SmartVote.Votes = make(map[string]string)
 	bot.Status = "smartvote"
-	split := strings.Split(params, "-")
+	split := strings.Split(params[0], "-")
 	if len(split) < 2 {
 		return errors.New("!smartvote: not enough args")
 	}
@@ -163,7 +169,6 @@ func (bot *Bot) Asciify(args ...string) error {
 		}
 		rewrite = true
 	}
-	fmt.Println(rewrite)
 	bot.SendMessage(EmoteCache(url, width, rewrite))
 	return nil
 }
