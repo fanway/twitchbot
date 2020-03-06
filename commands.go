@@ -142,18 +142,28 @@ func FfzBttv(emote string) (string, error) {
 
 }
 
-func (bot *Bot) Asciify(emote string, state string) error {
+func (bot *Bot) Asciify(args ...string) error {
 	var url string
 	var err error
-	switch state {
+	switch args[1] {
 	case "twitch":
-		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + emote + "/3.0"
+		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + args[0] + "/3.0"
 	case "ffzbttv":
-		url, err = FfzBttv(emote)
+		url, err = FfzBttv(args[0])
 		if err != nil {
 			return err
 		}
 	}
-	bot.SendMessage(EmoteCache(url))
+	width := 30
+	rewrite := false
+	if args[2] != "" {
+		width, err = strconv.Atoi(args[2])
+		if err != nil {
+			return err
+		}
+		rewrite = true
+	}
+	fmt.Println(rewrite)
+	bot.SendMessage(EmoteCache(url, width, rewrite))
 	return nil
 }

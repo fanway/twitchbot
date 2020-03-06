@@ -10,7 +10,7 @@ import (
 	_ "image/png"
 )
 
-func EmoteCache(url string) string {
+func EmoteCache(url string, width int, rewrite bool) string {
 	db := ConnectDb()
 	defer db.Close()
 	tx, err := db.Begin()
@@ -23,8 +23,8 @@ func EmoteCache(url string) string {
 		fmt.Println(err)
 	}
 	var str string
-	if err := tx.QueryRow("SELECT image FROM emoteCache WHERE url=$1;", url).Scan(&str); err == sql.ErrNoRows {
-		str = AsciifyRequest(url)
+	if err := tx.QueryRow("SELECT image FROM emoteCache WHERE url=$1;", url).Scan(&str); err == sql.ErrNoRows || rewrite {
+		str = AsciifyRequest(url, width)
 		_, err = tx.Exec("INSERT INTO emoteCache(url, image) VALUES($1,$2);", url, str)
 		if err != nil {
 			fmt.Println(err)
@@ -34,9 +34,8 @@ func EmoteCache(url string) string {
 	return str
 }
 
-func Braille(img image.Image) string {
+func Braille(img image.Image, maxW int) string {
 	b := img.Bounds()
-	maxW := 30
 	imageWidth := b.Max.X
 	imageHeight := b.Max.Y
 	var w, h int
@@ -48,6 +47,7 @@ func Braille(img image.Image) string {
 		w = imageWidth
 		h = imageHeight
 	}
+	fmt.Println(w, h)
 	rect := image.Rect(0, 0, w, h)
 	img1 := image.NewRGBA(rect)
 

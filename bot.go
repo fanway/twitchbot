@@ -220,10 +220,16 @@ func (bot *Bot) Commands(command string, username string, emotes string) {
 			err = bot.VoteOptionsCommand()
 		// !asciify <emote>
 		case "asciify":
+			split := strings.Split(cmd.Params, ",")
+			width := ""
+			if len(split) > 1 {
+				width = split[1]
+			}
+
 			if len(emotes) > 0 {
-				err = bot.Asciify(strings.Split(emotes, ":")[0], "twitch")
+				err = bot.Asciify(strings.Split(emotes, ":")[0], "twitch", width)
 			} else {
-				err = bot.Asciify(cmd.Params, "ffzbttv")
+				err = bot.Asciify(split[0], "ffzbttv", width)
 			}
 		}
 	}
