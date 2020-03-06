@@ -31,7 +31,7 @@ func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error
 		}
 		if cmd.Name == "asciify" {
 			width := ""
-			if len(cmd.Params) > 1 {
+			if len(cmd.Params) > 1 && level >= TOP {
 				width = cmd.Params[1]
 			}
 
