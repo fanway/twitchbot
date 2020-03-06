@@ -12,35 +12,124 @@ import (
 )
 
 type Command struct {
-	Name   string
-	Params []string
+	Name      string
+	Params    []string
+	LastUsage time.Time
+	Cd        int
+	Level     int
+	Handler   func([]string) error
 }
 
-func (cmd *Command) Parse(message string) error {
+func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error) {
 	args := strings.Split(message, " ")
 	if args[0] == "!" {
-		return errors.New("could not parse command")
+		return nil, errors.New("could not parse command")
 	}
-	cmd.Name = args[0][1:]
-	if len(args) > 1 {
-		cmd.Params = args[1:]
+	if cmd, ok := bot.Commands[args[0][1:]]; ok {
+		if len(args) > 1 {
+			cmd.Params = args[1:]
+		}
+		if cmd.Name == "asciify" {
+			width := ""
+			if len(cmd.Params) > 1 {
+				width = cmd.Params[1]
+			}
+
+			if cmd.Params == nil {
+				err := errors.New("!asciify: need emote")
+				return nil, err
+			}
+
+			if len(emotes) > 0 {
+				cmd.Params = []string{strings.Split(emotes, ":")[0], "twitch", width}
+			} else {
+				cmd.Params = []string{cmd.Params[0], "ffzbttv", width}
+			}
+		}
+
+		err := bot.Cooldown(cmd.Name, level)
+		if err != nil {
+			return nil, err
+		}
+		return cmd, nil
 	}
-	return nil
+	return nil, errors.New("could not parse command")
 }
 
-func (bot *Bot) Cooldown(command, username string, cd int) error {
-	if bot.Authority[username] == "top" {
+func (bot *Bot) initCommands() {
+	bot.Commands = map[string]*Command{
+		// !logs username, timeStart, timeEnd
+		"logs": &Command{
+			Name:      "logs",
+			Cd:        60,
+			LastUsage: time.Now(),
+			Level:     TOP,
+			Handler:   bot.LogsCommand,
+		},
+		// !smartvote lowerBound, upperBound
+		"smartvote": &Command{
+			Name:      "smartvote",
+			Cd:        30,
+			LastUsage: time.Now(),
+			Level:     TOP,
+			Handler:   bot.SmartVoteCommand,
+		},
+		// !stopvote
+		"stopvote": &Command{
+			Name:      "stopvote",
+			Cd:        15,
+			LastUsage: time.Now(),
+			Level:     TOP,
+			Handler:   bot.StopVoteCommand,
+		},
+		// !voteoptions
+		"voteoptions": &Command{
+			Name:      "voteoptions",
+			Cd:        5,
+			LastUsage: time.Now(),
+			Level:     MIDDLE,
+			Handler:   bot.VoteOptionsCommand,
+		},
+		// !asciify <emote>
+		"asciify": &Command{
+			Name:      "asciify",
+			Cd:        10,
+			LastUsage: time.Now(),
+			Level:     MIDDLE,
+			Handler:   bot.Asciify,
+		},
+	}
+}
+
+func (cmd *Command) ExecCommand(level int) error {
+	if level >= cmd.Level {
+		err := cmd.Handler(cmd.Params)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return errors.New("Not enough rights")
+}
+
+func (bot *Bot) Cooldown(command string, level int) error {
+	if level >= TOP {
 		return nil
 	}
 
-	t := time.Since(bot.Cd[command])
+	t := time.Since(bot.Commands[command].LastUsage)
 
-	if int(t) >= cd {
-		bot.Cd[command] = time.Now()
+	if int(t) >= bot.Commands[command].Cd {
+		bot.Commands[command].LastUsage = time.Now()
 		return nil
 	} else {
 		return errors.New("Command on cooldown")
 	}
+}
+
+func (bot *Bot) StopVoteCommand(params []string) error {
+	bot.Status = "Running"
+	return nil
 }
 
 func (bot *Bot) LogsCommand(params []string) error {
@@ -119,7 +208,7 @@ func (bot *Bot) SmartVoteCommand(params []string) error {
 	return nil
 }
 
-func (bot *Bot) VoteOptionsCommand() error {
+func (bot *Bot) VoteOptionsCommand(params []string) error {
 	if bot.Status != "smartvote" {
 		return errors.New("There is not any vote")
 	}
@@ -163,22 +252,22 @@ func FfzBttv(emote string) (string, error) {
 
 }
 
-func (bot *Bot) Asciify(args ...string) error {
+func (bot *Bot) Asciify(params []string) error {
 	var url string
 	var err error
-	switch args[1] {
+	switch params[1] {
 	case "twitch":
-		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + args[0] + "/3.0"
+		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + params[0] + "/3.0"
 	case "ffzbttv":
-		url, err = FfzBttv(args[0])
+		url, err = FfzBttv(params[0])
 		if err != nil {
 			return err
 		}
 	}
 	width := 30
 	rewrite := false
-	if args[2] != "" {
-		width, err = strconv.Atoi(args[2])
+	if params[2] != "" {
+		width, err = strconv.Atoi(params[2])
 		if err != nil {
 			return err
 		}

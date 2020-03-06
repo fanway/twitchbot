@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,6 +14,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+)
+
+const (
+	LOW = iota
+	MIDDLE
+	TOP
 )
 
 type SmartVote struct {
@@ -34,9 +39,9 @@ type Bot struct {
 	Server    string
 	Conn      net.Conn
 	File      *os.File
-	Authority map[string]string
+	Authority map[string]int
 	Status    string
-	Cd        map[string]time.Time
+	Commands  map[string]*Command
 	Utils     Utils
 }
 
@@ -131,6 +136,7 @@ func (bot *Bot) Connect(wg *sync.WaitGroup) {
 	fmt.Fprintf(bot.Conn, "JOIN %s\r\n", bot.Channel)
 	wg.Add(1)
 	go bot.ffzBttvInit()
+	bot.initCommands()
 	go bot.reader(wg)
 }
 
@@ -187,7 +193,7 @@ func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 		}
 
 		if usermessage[0:1] == "!" {
-			go bot.Commands(usermessage, username, emotes)
+			go bot.processCommands(usermessage, username, emotes)
 		}
 	} else if strings.Contains(line, "PING") { // response to keep connection alive
 		bot.Pong(line)
@@ -197,55 +203,23 @@ func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 }
 
 // chat commands
-func (bot *Bot) Commands(command string, username string, emotes string) {
-	var cmd Command
+func (bot *Bot) processCommands(command string, username string, emotes string) {
+	var cmd *Command
 	var err error
-	err = cmd.Parse(command)
-	switch bot.Authority[username] {
-	case "top":
-		switch cmd.Name {
-		// !logs username, timeStart, timeEnd
-		case "logs":
-			err = bot.LogsCommand(cmd.Params)
-		// !smartvote lowerBound, upperBound
-		case "smartvote":
-			err = bot.SmartVoteCommand(cmd.Params)
-		// !stopvote
-		case "stopvote":
-			bot.Status = "Running"
-		}
-		fallthrough
-	case "middle":
-		switch cmd.Name {
-		// !voteoptions
-		case "voteoptions":
-			err = bot.VoteOptionsCommand()
-		// !asciify <emote> TODO: move it to commands.go amd refactor whole pipeline
-		case "asciify":
-			width := ""
-			if len(cmd.Params) > 1 {
-				width = cmd.Params[1]
-			}
-
-			if cmd.Params == nil {
-				err = errors.New("!asciify: need emote")
-				break
-			}
-
-			if len(emotes) > 0 {
-				err = bot.Asciify(strings.Split(emotes, ":")[0], "twitch", width)
-			} else {
-				err = bot.Asciify(cmd.Params[0], "ffzbttv", width)
-			}
-		}
+	level := bot.Authority[username]
+	cmd, err = bot.ParseCommand(command, emotes, level)
+	if err != nil {
+		bot.Status = "Running"
+		fmt.Println(err)
 	}
+	err = cmd.ExecCommand(level)
 	if err != nil {
 		bot.Status = "Running"
 		fmt.Println(err)
 	}
 }
 
-func authorityInit() map[string]string {
+func authorityInit() map[string]int {
 	file, err := ioutil.ReadFile("authority.txt")
 	if err != nil {
 		fmt.Println(err)
@@ -254,7 +228,18 @@ func authorityInit() map[string]string {
 	if err = json.Unmarshal(file, &m); err != nil {
 		fmt.Println(err)
 	}
-	return m
+	mp := make(map[string]int)
+	for k := range m {
+		switch m[k] {
+		case "top":
+			mp[k] = TOP
+		case "middle":
+			mp[k] = MIDDLE
+		case "low":
+			mp[k] = LOW
+		}
+	}
+	return mp
 }
 
 func (bot *Bot) ffzBttvInit() {

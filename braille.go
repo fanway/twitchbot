@@ -47,7 +47,6 @@ func Braille(img image.Image, maxW int) string {
 		w = imageWidth
 		h = imageHeight
 	}
-	fmt.Println(w, h)
 	rect := image.Rect(0, 0, w, h)
 	img1 := image.NewRGBA(rect)
 
@@ -69,8 +68,6 @@ func Braille(img image.Image, maxW int) string {
 	}
 
 	th /= uint32(w * h)
-
-	fmt.Println(th)
 
 	output := ""
 	for imgY := 0; imgY < h; imgY += 4 {
