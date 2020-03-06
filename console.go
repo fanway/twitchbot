@@ -127,12 +127,10 @@ func Console(arrowBuffer *[]string, arrowCount *int) (string, int) {
 				} else if tempSecond == 'D' && arrowPointer < len(state) {
 					//left
 					arrowPointer++
-					fmt.Println(len(state), arrowPointer)
 					arrowState += "\033[D"
 				} else if tempSecond == 'C' && arrowPointer > 0 {
 					//right
 					arrowPointer--
-					fmt.Println(len(state), arrowPointer)
 					arrowState += "\033[C"
 				}
 			} else {
