@@ -188,6 +188,7 @@ func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 			if err != nil {
 				fmt.Println(err)
 			}
+			defer pasteFile.Close()
 			pasteWriter := bufio.NewWriter(pasteFile)
 			fmt.Fprintf(pasteWriter, "%s\n\n", usermessage)
 		}
@@ -242,6 +243,29 @@ func authorityInit() map[string]int {
 		}
 	}
 	return mp
+}
+
+func (bot *Bot) ChangeAuthority(username, level string) {
+	file, err := ioutil.ReadFile("authority.txt")
+	if err != nil {
+		fmt.Println(err)
+	}
+	var m map[string]string
+	if err = json.Unmarshal(file, &m); err != nil {
+		fmt.Println(err)
+	}
+	m[username] = level
+	newAuthority, err := json.Marshal(m)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	err = ioutil.WriteFile("authority.txt", newAuthority, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	bot.Authority = authorityInit()
 }
 
 func (bot *Bot) ffzBttvInit() {

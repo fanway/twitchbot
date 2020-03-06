@@ -321,7 +321,16 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			break
 		}
 		delete(botInstances, args[0])
-
+	case "change":
+		if len(args) != 3 {
+			fmt.Println("Provide valid args")
+			break
+		}
+		if _, ok := botInstances[args[0]]; ok {
+			botInstances[args[0]].ChangeAuthority(args[1], args[2])
+		} else {
+			fmt.Println("Provide valid channel name to which bot is currently connected")
+		}
 	}
 }
 
