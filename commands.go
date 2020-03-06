@@ -28,6 +28,21 @@ func (cmd *Command) Parse(message string) error {
 	return nil
 }
 
+func (bot *Bot) Cooldown(command, username string, cd int) error {
+	if bot.Authority[username] == "top" {
+		return nil
+	}
+
+	t := time.Since(bot.Cd[command])
+
+	if int(t) >= cd {
+		bot.Cd[command] = time.Now()
+		return nil
+	} else {
+		return errors.New("Command on cooldown")
+	}
+}
+
 func (bot *Bot) LogsCommand(params []string) error {
 	if params == nil {
 		return errors.New("!logs: not enough params")

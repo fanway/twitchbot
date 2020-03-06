@@ -36,6 +36,7 @@ type Bot struct {
 	File      *os.File
 	Authority map[string]string
 	Status    string
+	Cd        map[string]time.Time
 	Utils     Utils
 }
 
