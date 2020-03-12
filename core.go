@@ -265,9 +265,8 @@ func PersonsList(prefix string) []string {
 	return buffer
 }
 
-func AsciifyRequest(url string, width int) string {
+func AsciifyRequest(url string, width int, reverse bool) string {
 	client := &http.Client{}
-	//url := "http://static-cdn.jtvnw.net/emoticons/v1/" + args[0] + "/3.0"
 	req, _ := http.NewRequest("GET", url, nil)
 	res, err := client.Do(req)
 	if err != nil {
@@ -280,7 +279,7 @@ func AsciifyRequest(url string, width int) string {
 		fmt.Println(err)
 	}
 
-	return Braille(img, width)
+	return Braille(img, width, reverse)
 }
 
 func parseCommand(str string, botInstances map[string]*Bot) {

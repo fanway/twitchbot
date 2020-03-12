@@ -29,7 +29,7 @@ func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error
 		if len(args) > 1 {
 			cmd.Params = args[1:]
 		}
-		if cmd.Name == "asciify" {
+		if cmd.Name == "asciify" || cmd.Name == "asciify~" {
 			width := ""
 			if len(cmd.Params) > 1 {
 				if level < TOP {
@@ -44,9 +44,12 @@ func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error
 			}
 
 			if len(emotes) > 0 {
-				cmd.Params = []string{strings.Split(emotes, ":")[0], "twitch", width}
+				cmd.Params = []string{"false", strings.Split(emotes, ":")[0], "twitch", width}
 			} else {
-				cmd.Params = []string{cmd.Params[0], "ffzbttv", width}
+				cmd.Params = []string{"false", cmd.Params[0], "ffzbttv", width}
+			}
+			if cmd.Name == "asciify~" {
+				cmd.Params[0] = "true"
 			}
 		}
 
@@ -92,6 +95,12 @@ func (bot *Bot) initCommands() {
 		// !asciify <emote>
 		"asciify": &Command{
 			Name:    "asciify",
+			Cd:      10,
+			Level:   MIDDLE,
+			Handler: bot.Asciify,
+		},
+		"asciify~": &Command{
+			Name:    "asciify~",
 			Cd:      10,
 			Level:   MIDDLE,
 			Handler: bot.Asciify,
@@ -253,24 +262,31 @@ func FfzBttv(emote string) (string, error) {
 func (bot *Bot) Asciify(params []string) error {
 	var url string
 	var err error
-	switch params[1] {
+	switch params[2] {
 	case "twitch":
-		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + params[0] + "/3.0"
+		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + params[1] + "/3.0"
 	case "ffzbttv":
-		url, err = FfzBttv(params[0])
+		url, err = FfzBttv(params[1])
 		if err != nil {
 			return err
 		}
 	}
 	width := 30
 	rewrite := false
-	if params[2] != "" {
-		width, err = strconv.Atoi(params[2])
+	reverse, err := strconv.ParseBool(params[0])
+	if err != nil {
+		return err
+	}
+	if reverse {
+		rewrite = true
+	}
+	if params[3] != "" {
+		width, err = strconv.Atoi(params[3])
 		if err != nil {
 			return err
 		}
 		rewrite = true
 	}
-	bot.SendMessage(EmoteCache(url, width, rewrite))
+	bot.SendMessage(EmoteCache(reverse, url, width, rewrite))
 	return nil
 }

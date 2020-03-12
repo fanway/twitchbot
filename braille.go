@@ -10,7 +10,7 @@ import (
 	_ "image/png"
 )
 
-func EmoteCache(url string, width int, rewrite bool) string {
+func EmoteCache(reverse bool, url string, width int, rewrite bool) string {
 	db := ConnectDb()
 	defer db.Close()
 	tx, err := db.Begin()
@@ -24,7 +24,7 @@ func EmoteCache(url string, width int, rewrite bool) string {
 	}
 	var str string
 	if err := tx.QueryRow("SELECT image FROM emoteCache WHERE url=$1;", url).Scan(&str); err == sql.ErrNoRows || rewrite {
-		str = AsciifyRequest(url, width)
+		str = AsciifyRequest(url, width, reverse)
 		_, err = tx.Exec("INSERT INTO emoteCache(url, image) VALUES($1,$2);", url, str)
 		if err != nil {
 			fmt.Println(err)
@@ -34,7 +34,7 @@ func EmoteCache(url string, width int, rewrite bool) string {
 	return str
 }
 
-func Braille(img image.Image, maxW int) string {
+func Braille(img image.Image, maxW int, reverse bool) string {
 	b := img.Bounds()
 	imageWidth := b.Max.X
 	imageHeight := b.Max.Y
@@ -58,6 +58,7 @@ func Braille(img image.Image, maxW int) string {
 	for x := 0; x < w; x++ {
 		for y := 0; y < h; y++ {
 			r, g, b, _ := img.At(int(float32(x)*wRatio), int(float32(y)*hRatio)).RGBA()
+			// r*0.299 + g*0.587 + b*0.114
 			r = uint32(0.299 * float32(r))
 			g = uint32(0.587 * float32(g))
 			b = uint32(0.114 * float32(b))
@@ -81,7 +82,13 @@ func Braille(img image.Image, maxW int) string {
 				for x := 0; x < 2; x++ {
 					r, g, b, _ := img1.At(imgX+x, imgY+y).RGBA()
 					score := (r + g + b) / (3 * 256)
-					if score > th {
+					condition := false
+					if reverse {
+						condition = score < th
+					} else {
+						condition = score >= th
+					}
+					if condition {
 						if y != 3 {
 							curr |= currIdx << (x * 3)
 						} else {
