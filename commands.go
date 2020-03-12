@@ -31,11 +31,15 @@ func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error
 		}
 		if cmd.Name == "asciify" || cmd.Name == "asciify~" {
 			width := ""
+			thMult := ""
 			if len(cmd.Params) > 1 {
 				if level < TOP {
-					return nil, errors.New("!asciify: Not enough rights to change width")
+					return nil, errors.New("!asciify: Not enough rights to change settings")
 				}
 				width = cmd.Params[1]
+				if len(cmd.Params) == 3 {
+					thMult = cmd.Params[2]
+				}
 			}
 
 			if cmd.Params == nil {
@@ -44,9 +48,9 @@ func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error
 			}
 
 			if len(emotes) > 0 {
-				cmd.Params = []string{"false", strings.Split(emotes, ":")[0], "twitch", width}
+				cmd.Params = []string{"false", strings.Split(emotes, ":")[0], "twitch", width, thMult}
 			} else {
-				cmd.Params = []string{"false", cmd.Params[0], "ffzbttv", width}
+				cmd.Params = []string{"false", cmd.Params[0], "ffzbttv", width, thMult}
 			}
 			if cmd.Name == "asciify~" {
 				cmd.Params[0] = "true"
@@ -116,7 +120,7 @@ func (cmd *Command) ExecCommand(level int) error {
 		}
 		return nil
 	}
-	return errors.New("Not enough rights")
+	return errors.New("!" + cmd.Name + ": Not enough rights")
 }
 
 func (bot *Bot) Cooldown(command string, level int) error {
@@ -272,6 +276,8 @@ func (bot *Bot) Asciify(params []string) error {
 		}
 	}
 	width := 30
+	var thMult float32
+	thMult = 1.0
 	rewrite := false
 	reverse, err := strconv.ParseBool(params[0])
 	if err != nil {
@@ -287,6 +293,14 @@ func (bot *Bot) Asciify(params []string) error {
 		}
 		rewrite = true
 	}
-	bot.SendMessage(EmoteCache(reverse, url, width, rewrite))
+	if params[4] != "" {
+		thMultTemp, err := strconv.ParseFloat(params[4], 32)
+		thMult = float32(thMultTemp)
+		if err != nil {
+			return err
+		}
+		rewrite = true
+	}
+	bot.SendMessage(EmoteCache(reverse, url, width, rewrite, thMult))
 	return nil
 }

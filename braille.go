@@ -10,7 +10,7 @@ import (
 	_ "image/png"
 )
 
-func EmoteCache(reverse bool, url string, width int, rewrite bool) string {
+func EmoteCache(reverse bool, url string, width int, rewrite bool, thMult float32) string {
 	db := ConnectDb()
 	defer db.Close()
 	tx, err := db.Begin()
@@ -24,7 +24,7 @@ func EmoteCache(reverse bool, url string, width int, rewrite bool) string {
 	}
 	var str string
 	if err := tx.QueryRow("SELECT image FROM emoteCache WHERE url=$1;", url).Scan(&str); err == sql.ErrNoRows || rewrite {
-		str = AsciifyRequest(url, width, reverse)
+		str = AsciifyRequest(url, width, reverse, thMult)
 		_, err = tx.Exec("INSERT INTO emoteCache(url, image) VALUES($1,$2);", url, str)
 		if err != nil {
 			fmt.Println(err)
@@ -34,7 +34,7 @@ func EmoteCache(reverse bool, url string, width int, rewrite bool) string {
 	return str
 }
 
-func Braille(img image.Image, maxW int, reverse bool) string {
+func Braille(img image.Image, maxW int, reverse bool, thMult float32) string {
 	b := img.Bounds()
 	imageWidth := b.Max.X
 	imageHeight := b.Max.Y
@@ -69,6 +69,7 @@ func Braille(img image.Image, maxW int, reverse bool) string {
 	}
 
 	th /= uint32(w * h)
+	th = uint32(float32(th) * thMult)
 
 	output := ""
 	for imgY := 0; imgY < h; imgY += 4 {
