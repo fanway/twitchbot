@@ -48,9 +48,9 @@ func (bot *Bot) ParseCommand(message, emotes, username string, level int) (*Comm
 			}
 
 			if len(emotes) > 0 {
-				cmd.Params = []string{"false", strings.Split(emotes, ":")[0], "twitch", width, thMult}
+				cmd.Params = []string{"false", strings.Split(emotes, ":")[0] + ":" + cmd.Params[0], "twitch", width, thMult}
 			} else {
-				cmd.Params = []string{"false", cmd.Params[0], "ffzbttv", width, thMult}
+				cmd.Params = []string{"false", ":" + cmd.Params[0], "ffzbttv", width, thMult}
 			}
 			if cmd.Name == "asciify~" {
 				cmd.Params[0] = "true"
@@ -267,18 +267,38 @@ func FfzBttv(emote string) (string, error) {
 		return "", err
 	}
 
+	tx.Commit()
 	return str, nil
+}
 
+func addEmote(url, code string) error {
+	db := ConnectDb()
+	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", url, code)
+	if err != nil {
+		return err
+	}
+	tx.Commit()
+	return nil
 }
 
 func (bot *Bot) Asciify(params []string) error {
 	var url string
+	var emote string
 	var err error
+	split := strings.Split(params[1], ":")
+	emote = split[1]
+	url, err = FfzBttv(params[1])
 	switch params[2] {
 	case "twitch":
-		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + params[1] + "/3.0"
+		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + split[0] + "/3.0"
+		addEmote(url, emote)
 	case "ffzbttv":
-		url, err = FfzBttv(params[1])
 		if err != nil {
 			return err
 		}
@@ -303,12 +323,16 @@ func (bot *Bot) Asciify(params []string) error {
 	}
 	if params[4] != "" {
 		thMultTemp, err := strconv.ParseFloat(params[4], 32)
-		thMult = float32(thMultTemp)
 		if err != nil {
 			return err
 		}
+		thMult = float32(thMultTemp)
 		rewrite = true
 	}
-	bot.SendMessage(EmoteCache(reverse, url, width, rewrite, thMult))
+	asciifiedImage, err := EmoteCache(reverse, url, width, rewrite, thMult, emote)
+	if err != nil {
+		return err
+	}
+	bot.SendMessage(asciifiedImage)
 	return nil
 }

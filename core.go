@@ -265,21 +265,19 @@ func PersonsList(prefix string) []string {
 	return buffer
 }
 
-func AsciifyRequest(url string, width int, reverse bool, thMult float32) string {
+func AsciifyRequest(url string, width int, reverse bool, thMult float32) (string, error) {
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
 	res, err := client.Do(req)
 	if err != nil {
-		fmt.Println(res)
+		return "", err
 	}
 	defer res.Body.Close()
-
 	img, _, err := image.Decode(res.Body)
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	return Braille(img, width, reverse, thMult)
+	return Braille(img, width, reverse, thMult), nil
 }
 
 func parseCommand(str string, botInstances map[string]*Bot, currentChannel *string) {
