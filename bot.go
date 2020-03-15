@@ -193,7 +193,7 @@ func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 			fmt.Fprintf(pasteWriter, "%s\n\n", usermessage)
 		}
 
-		if usermessage[0:1] == "!" {
+		if usermessage[0] == '!' {
 			go bot.processCommands(usermessage, username, emotes)
 		}
 	} else if strings.Contains(line, "PING") { // response to keep connection alive
@@ -204,11 +204,11 @@ func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 }
 
 // chat commands
-func (bot *Bot) processCommands(command string, username string, emotes string) {
+func (bot *Bot) processCommands(message, username, emotes string) {
 	var cmd *Command
 	var err error
 	level := bot.Authority[username]
-	cmd, err = bot.ParseCommand(command, emotes, level)
+	cmd, err = bot.ParseCommand(message, emotes, username, level)
 	if err != nil {
 		bot.Status = "Running"
 		fmt.Println(err)

@@ -20,7 +20,7 @@ type Command struct {
 	Handler   func([]string) error
 }
 
-func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error) {
+func (bot *Bot) ParseCommand(message, emotes, username string, level int) (*Command, error) {
 	args := strings.Split(message, " ")
 	if args[0] == "!" {
 		return nil, errors.New("could not parse command")
@@ -56,6 +56,8 @@ func (bot *Bot) ParseCommand(message, emotes string, level int) (*Command, error
 				cmd.Params[0] = "true"
 			}
 		}
+
+		cmd.Params = append(cmd.Params, username)
 
 		err := bot.Cooldown(cmd.Name, level)
 		if err != nil {
@@ -108,6 +110,12 @@ func (bot *Bot) initCommands() {
 			Cd:      10,
 			Level:   MIDDLE,
 			Handler: bot.Asciify,
+		},
+		"ш": &Command{
+			Name:    "ш",
+			Cd:      25,
+			Level:   MIDDLE,
+			Handler: bot.Markov,
 		},
 	}
 }

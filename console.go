@@ -32,7 +32,7 @@ func getChar(f *os.File) byte {
 	return bs[0]
 }
 
-func setTerm() {
+func SetTerm() {
 	raw, err := unix.IoctlGetTermios(int(os.Stdin.Fd()), unix.TIOCGETA)
 	if err != nil {
 		//panic(err)
@@ -73,16 +73,15 @@ func processTab(state *string, buffer *[]string, tabCount *int) {
 	}
 }
 
-func Console(arrowBuffer *[]string, arrowCount *int) (string, int) {
+func Console(arrowBuffer *[]string, arrowCount *int, currentChannel *string) (string, int) {
 	var state string
 	var buffer []string
 	var tabCount int
 	var arrowPointer int
 	var arrowState string
-	setTerm()
 	for {
 		// \033[H
-		fmt.Print("\033[2K\r" + state + arrowState)
+		fmt.Print("\033[2K\r" + "[" + *currentChannel + "]> " + state + arrowState)
 		ch := getChar(os.Stdin)
 		switch ch {
 		case BACKSPACE:
