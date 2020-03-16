@@ -46,6 +46,7 @@ func Braille(img image.Image, maxW int, reverse bool, thMult float32) string {
 	imageHeight := b.Max.Y
 	var w, h int
 	ratio := float32(imageHeight) / float32(imageWidth)
+	// scale image to fit into given width and braille unicode character (1 braille symbol is 2x4)
 	if imageWidth != maxW*2 {
 		w = 2 * maxW
 		h = 4 * int((float32(w) * ratio / 4))
@@ -61,6 +62,7 @@ func Braille(img image.Image, maxW int, reverse bool, thMult float32) string {
 
 	var th uint32
 
+	// grayscale an image and count a threshold as an average value of the pixel intensity
 	for x := 0; x < w; x++ {
 		for y := 0; y < h; y++ {
 			r, g, b, _ := img.At(int(float32(x)*wRatio), int(float32(y)*hRatio)).RGBA()
@@ -77,6 +79,12 @@ func Braille(img image.Image, maxW int, reverse bool, thMult float32) string {
 	th /= uint32(w * h)
 	th = uint32(float32(th) * thMult)
 
+	// braillify/asciify algorithm:
+	// https://en.wikipedia.org/wiki/Braille_Patterns
+	// We are going top to bottom, left to right
+	// Considering each patter as a binary number, turn on the current bit if
+	// the intensity in the pixel is more or equal (less) than a threshold
+	// After that, the binary number represents an offset starting from 0x2800 (first braille unicode symbol)
 	output := ""
 	for imgY := 0; imgY < h; imgY += 4 {
 		for imgX := 0; imgX < w; imgX += 2 {

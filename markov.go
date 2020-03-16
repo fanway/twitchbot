@@ -30,19 +30,19 @@ func (bot *Bot) Markov(params []string) error {
 	for scanner.Scan() {
 		i++
 		line := scanner.Text()
-		if strings.Contains(line, "PING") {
+		if strings.Contains(line, "PING") || line[0] == ':' {
 			continue
 		}
-		if line[0] == ':' {
-			continue
-		}
+		// parse message
 		str := strings.Split(strings.Split(line, "]")[1], ": ")[1]
 		sp := strings.Split(str, " ")
 		if len(sp) < 1 {
 			continue
 		}
+		// add special word
 		add(m, "Begin", sp[0])
 		add(m, sp[len(sp)-1], "End")
+		// add words in message
 		for j := 1; j < len(sp)-1; j++ {
 			add(m, sp[j], sp[j+1])
 		}
@@ -57,8 +57,10 @@ func (bot *Bot) Markov(params []string) error {
 		}
 		word := text[len(text)-1]
 		var randSlice []string
+		// take random next word, taking into account the frequency of words
 		for k, _ := range m[word] {
 			for i := 0; i < m[word][k]; i++ {
+				// m[word][k] is the number of times the word "word" comes before the word "k"
 				randSlice = append(randSlice, k)
 			}
 		}

@@ -176,7 +176,9 @@ func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 		w.Flush()
 		messageLength := len(usermessage)
 		if bot.Status == "smartvote" && messageLength == 1 {
+			// check if there is that vote option
 			if _, ok := bot.Utils.SmartVote.Options[usermessage]; ok {
+				// consider only the first vote
 				if _, ok := bot.Utils.SmartVote.Votes[username]; !ok {
 					bot.Utils.SmartVote.Options[usermessage]++
 					bot.Utils.SmartVote.Votes[username] = usermessage

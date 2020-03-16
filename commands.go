@@ -47,6 +47,7 @@ func (bot *Bot) ParseCommand(message, emotes, username string, level int) (*Comm
 				return nil, err
 			}
 
+			// cmd.Params = {bool: reverse image, string: "id of an emote:code of an emote", string: "from twitch or ffzbttv", int: width, float: threshold multiplier"
 			if len(emotes) > 0 {
 				cmd.Params = []string{"false", strings.Split(emotes, ":")[0] + ":" + cmd.Params[0], "twitch", width, thMult}
 			} else {
@@ -105,12 +106,14 @@ func (bot *Bot) initCommands() {
 			Level:   MIDDLE,
 			Handler: bot.Asciify,
 		},
+		// !asciify <emote>
 		"asciify~": &Command{
 			Name:    "asciify~",
 			Cd:      10,
 			Level:   MIDDLE,
 			Handler: bot.Asciify,
 		},
+		// !ш
 		"ш": &Command{
 			Name:    "ш",
 			Cd:      25,
@@ -135,9 +138,7 @@ func (bot *Bot) Cooldown(command string, level int) error {
 	if level >= TOP {
 		return nil
 	}
-
 	t := time.Since(bot.Commands[command].LastUsage)
-
 	if t >= time.Duration(bot.Commands[command].Cd)*time.Second {
 		bot.Commands[command].LastUsage = time.Now()
 		return nil
@@ -253,6 +254,7 @@ func (bot *Bot) VoteOptionsCommand(params []string) error {
 	return nil
 }
 
+// check if there is an emote in the database
 func FfzBttv(emote string) (string, error) {
 	db := ConnectDb()
 	defer db.Close()
@@ -311,6 +313,7 @@ func (bot *Bot) Asciify(params []string) error {
 	if err != nil {
 		return err
 	}
+	// width of an image parameter
 	if params[3] != "" {
 		width, err = strconv.Atoi(params[3])
 		if err != nil {
@@ -318,6 +321,7 @@ func (bot *Bot) Asciify(params []string) error {
 		}
 		rewrite = true
 	}
+	// threshold multiplier parameter
 	if params[4] != "" {
 		thMultTemp, err := strconv.ParseFloat(params[4], 32)
 		if err != nil {
