@@ -19,7 +19,7 @@ func add(m map[string]map[string]int, first, second string) {
 
 func (bot *Bot) Markov(params []string) error {
 	msg := ""
-	file, err := os.Open("#taarakan.log")
+	file, err := os.Open("#" + params[0] + ".log")
 	defer file.Close()
 	if err != nil {
 		return err
