@@ -17,17 +17,21 @@ func EmoteCache(reverse bool, url string, width int, rewrite bool, thMult float3
 		return "", err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec("CREATE TABLE IF NOT EXISTS emoteCache(emote TEXT NOT NULL,image TEXT NOT NULL, UNIQUE (emote) ON CONFLICT REPLACE);")
+	_, err = tx.Exec("CREATE TABLE IF NOT EXISTS emoteCache(emote TEXT NOT NULL, image TEXT NOT NULL DEFAULT '', reversedImage TEXT NOT NULL DEFAULT '', UNIQUE (emote) ON CONFLICT REPLACE);")
 	if err != nil {
 		return "", err
 	}
 	var str string
-	if err := tx.QueryRow("SELECT image FROM emoteCache WHERE emote=$1;", emote).Scan(&str); err == sql.ErrNoRows || rewrite {
+	column := "image"
+	if reverse {
+		column = "reversedImage"
+	}
+	if err := tx.QueryRow("SELECT "+column+" FROM emoteCache WHERE emote=$l;", emote).Scan(&str); err == sql.ErrNoRows || rewrite || str == "" {
 		str, err = AsciifyRequest(url, width, reverse, thMult)
 		if err != nil {
 			return "", err
 		}
-		_, err = tx.Exec("INSERT INTO emoteCache(emote, image) VALUES($1,$2);", emote, str)
+		_, err = tx.Exec("INSERT INTO emoteCache(emote, "+column+") VALUES($1,$2);", emote, str)
 		if err != nil {
 			return "", err
 		}

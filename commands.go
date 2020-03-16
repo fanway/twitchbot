@@ -293,7 +293,7 @@ func (bot *Bot) Asciify(params []string) error {
 	var err error
 	split := strings.Split(params[1], ":")
 	emote = split[1]
-	url, err = FfzBttv(params[1])
+	url, err = FfzBttv(emote)
 	switch params[2] {
 	case "twitch":
 		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + split[0] + "/3.0"
@@ -310,9 +310,6 @@ func (bot *Bot) Asciify(params []string) error {
 	reverse, err := strconv.ParseBool(params[0])
 	if err != nil {
 		return err
-	}
-	if reverse {
-		rewrite = true
 	}
 	if params[3] != "" {
 		width, err = strconv.Atoi(params[3])
