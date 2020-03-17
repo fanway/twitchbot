@@ -200,8 +200,6 @@ func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 		}
 	} else if strings.Contains(line, "PING") { // response to keep connection alive
 		bot.Pong(line)
-		fmt.Fprintln(w, line)
-		w.Flush()
 	}
 }
 
