@@ -325,7 +325,7 @@ func (bot *Bot) ffzBttvInit() {
 			fmt.Println(err)
 		}
 	}
-	for _, u := range bttv.SharedEmotes {
+	for _, u := range bttv.ChannelEmotes {
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
 		if err != nil {
 			fmt.Println(err)
