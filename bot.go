@@ -153,6 +153,8 @@ func (bot *Bot) SendMessage(msg string) {
 func (bot *Bot) reader(wg *sync.WaitGroup) {
 	tp := textproto.NewReader(bufio.NewReader(bot.Conn))
 	w := bufio.NewWriter(bot.File)
+	logChan := make(chan Message)
+	go logsWriter(w, logChan, wg)
 	for {
 		line, err := tp.ReadLine()
 		if err != nil {
@@ -160,20 +162,35 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 			break
 		}
 		// parsing chat
-		go bot.parseChat(line, w)
+		go bot.parseChat(line, w, logChan)
 		defer wg.Done()
 	}
 }
 
-func (bot *Bot) parseChat(line string, w *bufio.Writer) {
+type Message struct {
+	Username string
+	Text     string
+}
+
+func logsWriter(w *bufio.Writer, logChan <-chan Message, wg *sync.WaitGroup) {
+	for {
+		select {
+		case message := <-logChan:
+			fmt.Fprintf(w, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05 -0700 MST"), message.Username, message.Text)
+			w.Flush()
+		}
+		defer wg.Done()
+	}
+}
+
+func (bot *Bot) parseChat(line string, w *bufio.Writer, logChan chan<- Message) {
 	if strings.Contains(line, "PRIVMSG") {
 		line := line[1:]
 		userdata := strings.Split(line, ".tmi.twitch.tv PRIVMSG "+bot.Channel)
 		username := strings.Split(userdata[0], "@")[1]
 		emotes := strings.Split(strings.Split(userdata[0], "emotes=")[1], ";")[0]
 		usermessage := strings.Replace(userdata[1], " :", "", 1)
-		fmt.Fprintf(w, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05 -0700 MST"), username, usermessage)
-		w.Flush()
+		logChan <- Message{username, usermessage}
 		messageLength := len(usermessage)
 		if bot.Status == "smartvote" && messageLength == 1 {
 			// check if there is that vote option
@@ -198,7 +215,7 @@ func (bot *Bot) parseChat(line string, w *bufio.Writer) {
 		if usermessage[0] == '!' {
 			go bot.processCommands(usermessage, username, emotes)
 		}
-	} else if strings.Contains(line, "PING") { // response to keep connection alive
+	} else if strings.HasPrefix(line, "PING") { // response to keep connection alive
 		bot.Pong(line)
 	}
 }
