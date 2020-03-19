@@ -30,9 +30,6 @@ func (bot *Bot) Markov(params []string) error {
 	for scanner.Scan() {
 		i++
 		line := scanner.Text()
-		if strings.Contains(line, "PING") || line[0] == ':' {
-			continue
-		}
 		// parse message
 		str := strings.Split(strings.Split(line, "]")[1], ": ")[1]
 		sp := strings.Split(str, " ")
