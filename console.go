@@ -64,11 +64,10 @@ func processTab(state *string, buffer *[]string, tabCount *int) {
 
 	switch command {
 	case "find":
-		rows := PersonsList(prefix)
-		for i := range rows {
-			*buffer = append(*buffer, rows[i])
+		*buffer = PersonsList(prefix)
+		if len(*buffer) == 0 {
+			*buffer = append(*buffer, args[0])
 		}
-
 		*state += (*buffer)[*tabCount]
 	}
 }
