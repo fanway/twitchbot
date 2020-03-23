@@ -143,7 +143,6 @@ func findPerson(name string) {
 	for _, d := range followers.Data {
 		_, err := tx.Exec("INSERT INTO temp.Follow(FromId, FromName, ToId, ToName, FollowedAt) values($1, $2, $3, $4, $5);", d.FromID, d.FromName, d.ToID, d.ToName, d.FollowedAt)
 		if err != nil {
-			fmt.Println("temp table")
 			fmt.Println(err)
 		}
 	}

@@ -116,7 +116,8 @@ func Console(arrowBuffer *[]string, arrowCount *int, currentChannel *string) (st
 					}
 				} else if tempSecond == 'B' && len(*arrowBuffer) > 0 {
 					//down
-					if *arrowCount == len(*arrowBuffer)-1 {
+					if *arrowCount >= len(*arrowBuffer)-1 {
+						*arrowCount = len(*arrowBuffer)
 						state = ""
 					} else {
 						*arrowCount++
