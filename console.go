@@ -72,9 +72,9 @@ func processTab(state *string, buffer *[]string, tabCount *int) {
 	}
 }
 
-func createPrefixBuffer(state string, buffer *[]string) []string {
+func createPrefixBuffer(state string, console *Console) []string {
 	var prefixBuffer []string
-	for _, s := range *buffer {
+	for _, s := range console.commandsBuffer {
 		if strings.HasPrefix(s, state) && s != state {
 			prefixBuffer = append(prefixBuffer, s)
 		}
@@ -83,16 +83,16 @@ func createPrefixBuffer(state string, buffer *[]string) []string {
 	return prefixBuffer
 }
 
-func Console(commandsBuffer *[]string, commandsBufferCounter *int, currentChannel *string) (string, int) {
+func (console *Console) processConsole() (string, int) {
 	var state string
-	var buffer []string
-	var prefixBuffer []string
+	var tabBuffer []string
 	var tabCount int
+	var prefixBuffer []string
 	var arrowPointer int
 	var arrowState string
 	for {
 		// \033[H
-		fmt.Print("\033[2K\r" + "[" + *currentChannel + "]> " + state + arrowState)
+		fmt.Print("\033[2K\r" + "[" + console.currentChannel + "]> " + state + arrowState)
 		ch := getChar(os.Stdin)
 		switch ch {
 		case BACKSPACE:
@@ -107,45 +107,45 @@ func Console(commandsBuffer *[]string, commandsBufferCounter *int, currentChanne
 					}
 				}
 			}
-			buffer = buffer[:0]
+			tabBuffer = tabBuffer[:0]
 			prefixBuffer = prefixBuffer[:0]
 			tabCount = 0
 		case ENTER:
-			*commandsBuffer = append(*commandsBuffer, state)
-			*commandsBufferCounter = len(*commandsBuffer)
+			console.commandsBuffer = append(console.commandsBuffer, state)
+			console.commandsBufferCounter = len(console.commandsBuffer)
 			fmt.Println("")
 			return state, ENTER
 		case TAB:
-			processTab(&state, &buffer, &tabCount)
+			processTab(&state, &tabBuffer, &tabCount)
 		case ESC:
 			tempFirst := getChar(os.Stdin)
 			if tempFirst == '[' {
 				tempSecond := getChar(os.Stdin)
 				switch tempSecond {
 				case 'A':
-					if len(*commandsBuffer) > 0 {
+					if len(console.commandsBuffer) > 0 {
 						if len(prefixBuffer) == 0 {
-							prefixBuffer = createPrefixBuffer(state, commandsBuffer)
-							*commandsBufferCounter = len(prefixBuffer) - 1
+							prefixBuffer = createPrefixBuffer(state, console)
+							console.commandsBufferCounter = len(prefixBuffer) - 1
 						}
 						//up
-						if *commandsBufferCounter != 0 {
-							*commandsBufferCounter--
-							state = prefixBuffer[*commandsBufferCounter]
+						if console.commandsBufferCounter != 0 {
+							console.commandsBufferCounter--
+							state = prefixBuffer[console.commandsBufferCounter]
 						}
 					}
 				case 'B':
-					if len(*commandsBuffer) > 0 {
+					if len(console.commandsBuffer) > 0 {
 						if len(prefixBuffer) == 0 {
-							prefixBuffer = createPrefixBuffer(state, commandsBuffer)
-							*commandsBufferCounter = len(prefixBuffer) - 1
+							prefixBuffer = createPrefixBuffer(state, console)
+							console.commandsBufferCounter = len(prefixBuffer) - 1
 						}
 						//down
-						if *commandsBufferCounter >= len(prefixBuffer)-1 {
+						if console.commandsBufferCounter >= len(prefixBuffer)-1 {
 							state = prefixBuffer[len(prefixBuffer)-1]
 						} else {
-							*commandsBufferCounter++
-							state = prefixBuffer[*commandsBufferCounter]
+							console.commandsBufferCounter++
+							state = prefixBuffer[console.commandsBufferCounter]
 						}
 					}
 				case 'D':

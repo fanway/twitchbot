@@ -279,7 +279,7 @@ func AsciifyRequest(url string, width int, reverse bool, thMult float32) (string
 	return Braille(img, width, reverse, thMult), nil
 }
 
-func parseCommand(str string, botInstances map[string]*Bot, currentChannel *string) {
+func parseCommand(str string, botInstances map[string]*Bot, console Console) {
 	args := strings.Split(str, " ")
 	if len(args) < 2 {
 		fmt.Println("Not enough args")
@@ -295,7 +295,7 @@ func parseCommand(str string, botInstances map[string]*Bot, currentChannel *stri
 			break
 		}
 		go StartBot(args[0], botInstances)
-		*currentChannel = args[0]
+		console.currentChannel = args[0]
 	case "find":
 		if len(args) != 1 {
 			fmt.Println("Provide channel name")
@@ -318,7 +318,7 @@ func parseCommand(str string, botInstances map[string]*Bot, currentChannel *stri
 			break
 		}
 		delete(botInstances, args[0])
-		*currentChannel = "#"
+		console.currentChannel = "#"
 	case "change":
 		if len(args) != 3 {
 			fmt.Println("Provide valid args")
@@ -329,21 +329,35 @@ func parseCommand(str string, botInstances map[string]*Bot, currentChannel *stri
 		} else {
 			fmt.Println("Provide valid channel name to which bot is currently connected")
 		}
+	case "clear":
+		if len(args) != 1 {
+			fmt.Println("What should i clear???")
+			break
+		}
+		if args[0] == "buffer" {
+			console.commandsBuffer = console.commandsBuffer[:0]
+			console.commandsBufferCounter = 0
+		}
 	}
 }
 
+type Console struct {
+	commandsBuffer        []string
+	commandsBufferCounter int
+	currentChannel        string
+}
+
 func main() {
-	var commandsBuffer []string
-	var commandsBufferCounter int
+	var console Console
 	//logChan := make(chan string)
-	currentChannel := "#"
+	console.currentChannel = "#"
 	botInstaces := make(map[string]*Bot)
 	SetTerm()
 	for {
-		args, status := Console(&commandsBuffer, &commandsBufferCounter, &currentChannel)
+		args, status := console.processConsole()
 		switch status {
 		case ENTER:
-			parseCommand(args, botInstaces, &currentChannel)
+			parseCommand(args, botInstaces, console)
 		}
 	}
 }
