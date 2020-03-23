@@ -72,9 +72,21 @@ func processTab(state *string, buffer *[]string, tabCount *int) {
 	}
 }
 
-func Console(arrowBuffer *[]string, arrowCount *int, currentChannel *string) (string, int) {
+func createPrefixBuffer(state string, buffer *[]string) []string {
+	var prefixBuffer []string
+	for _, s := range *buffer {
+		if strings.HasPrefix(s, state) && s != state {
+			prefixBuffer = append(prefixBuffer, s)
+		}
+	}
+	prefixBuffer = append(prefixBuffer, state)
+	return prefixBuffer
+}
+
+func Console(commandsBuffer *[]string, commandsBufferCounter *int, currentChannel *string) (string, int) {
 	var state string
 	var buffer []string
+	var prefixBuffer []string
 	var tabCount int
 	var arrowPointer int
 	var arrowState string
@@ -96,10 +108,11 @@ func Console(arrowBuffer *[]string, arrowCount *int, currentChannel *string) (st
 				}
 			}
 			buffer = buffer[:0]
+			prefixBuffer = prefixBuffer[:0]
 			tabCount = 0
 		case ENTER:
-			*arrowBuffer = append(*arrowBuffer, state)
-			*arrowCount = len(*arrowBuffer)
+			*commandsBuffer = append(*commandsBuffer, state)
+			*commandsBufferCounter = len(*commandsBuffer)
 			fmt.Println("")
 			return state, ENTER
 		case TAB:
@@ -108,29 +121,45 @@ func Console(arrowBuffer *[]string, arrowCount *int, currentChannel *string) (st
 			tempFirst := getChar(os.Stdin)
 			if tempFirst == '[' {
 				tempSecond := getChar(os.Stdin)
-				if tempSecond == 'A' && len(*arrowBuffer) > 0 {
-					//up
-					if *arrowCount != 0 {
-						*arrowCount--
-						state = (*arrowBuffer)[*arrowCount]
+				switch tempSecond {
+				case 'A':
+					if len(*commandsBuffer) > 0 {
+						if len(prefixBuffer) == 0 {
+							prefixBuffer = createPrefixBuffer(state, commandsBuffer)
+							*commandsBufferCounter = len(prefixBuffer) - 1
+						}
+						//up
+						if *commandsBufferCounter != 0 {
+							*commandsBufferCounter--
+							state = prefixBuffer[*commandsBufferCounter]
+						}
 					}
-				} else if tempSecond == 'B' && len(*arrowBuffer) > 0 {
-					//down
-					if *arrowCount >= len(*arrowBuffer)-1 {
-						*arrowCount = len(*arrowBuffer)
-						state = ""
-					} else {
-						*arrowCount++
-						state = (*arrowBuffer)[*arrowCount]
+				case 'B':
+					if len(*commandsBuffer) > 0 {
+						if len(prefixBuffer) == 0 {
+							prefixBuffer = createPrefixBuffer(state, commandsBuffer)
+							*commandsBufferCounter = len(prefixBuffer) - 1
+						}
+						//down
+						if *commandsBufferCounter >= len(prefixBuffer)-1 {
+							state = prefixBuffer[len(prefixBuffer)-1]
+						} else {
+							*commandsBufferCounter++
+							state = prefixBuffer[*commandsBufferCounter]
+						}
 					}
-				} else if tempSecond == 'D' && arrowPointer < len(state) {
-					//left
-					arrowPointer++
-					arrowState += "\033[D"
-				} else if tempSecond == 'C' && arrowPointer > 0 {
-					//right
-					arrowPointer--
-					arrowState += "\033[C"
+				case 'D':
+					if arrowPointer < len(state) {
+						//left
+						arrowPointer++
+						arrowState += "\033[D"
+					}
+				case 'C':
+					if arrowPointer > 0 {
+						//right
+						arrowPointer--
+						arrowState += "\033[C"
+					}
 				}
 			} else {
 				state += string(tempFirst)
@@ -138,6 +167,7 @@ func Console(arrowBuffer *[]string, arrowCount *int, currentChannel *string) (st
 		default:
 			n := len(state) - arrowPointer - 1
 			state = state[:n+1] + string(ch) + state[n+1:]
+			prefixBuffer = prefixBuffer[:0]
 		}
 	}
 }

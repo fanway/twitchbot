@@ -333,14 +333,14 @@ func parseCommand(str string, botInstances map[string]*Bot, currentChannel *stri
 }
 
 func main() {
-	var arrowBuffer []string
-	var arrowCount int
+	var commandsBuffer []string
+	var commandsBufferCounter int
 	//logChan := make(chan string)
 	currentChannel := "#"
 	botInstaces := make(map[string]*Bot)
 	SetTerm()
 	for {
-		args, status := Console(&arrowBuffer, &arrowCount, &currentChannel)
+		args, status := Console(&commandsBuffer, &commandsBufferCounter, &currentChannel)
 		switch status {
 		case ENTER:
 			parseCommand(args, botInstaces, &currentChannel)
