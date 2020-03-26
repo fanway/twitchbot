@@ -279,7 +279,7 @@ func AsciifyRequest(url string, width int, reverse bool, thMult float32) (string
 	return Braille(img, width, reverse, thMult), nil
 }
 
-func parseCommand(str string, botInstances map[string]*Bot, console Console) {
+func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 	args := strings.Split(str, " ")
 	if len(args) < 2 {
 		fmt.Println("Not enough args")
@@ -357,7 +357,7 @@ func main() {
 		args, status := console.processConsole()
 		switch status {
 		case ENTER:
-			parseCommand(args, botInstaces, console)
+			parseCommand(args, botInstaces, &console)
 		}
 	}
 }
