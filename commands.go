@@ -20,6 +20,14 @@ type Command struct {
 	Handler   func([]string) error
 }
 
+func checkForUrl(url string) string {
+	if strings.HasPrefix(url, "https://") &&
+		(strings.HasSuffix(url, ".jpeg") || strings.HasSuffix(url, ".jpg") || strings.HasSuffix(url, ".png")) {
+		return url
+	}
+	return ""
+}
+
 func (bot *Bot) ParseCommand(message, emotes, username string, level int) (*Command, error) {
 	args := strings.Split(message, " ")
 	if args[0] == "!" {
@@ -46,12 +54,12 @@ func (bot *Bot) ParseCommand(message, emotes, username string, level int) (*Comm
 				err := errors.New("!asciify: need emote")
 				return nil, err
 			}
-
+			url := checkForUrl(cmd.Params[0])
 			// cmd.Params = {bool: reverse image, string: "id of an emote:code of an emote", string: "from twitch or ffzbttv", int: width, float: threshold multiplier"
 			if len(emotes) > 0 {
-				cmd.Params = []string{"false", strings.Split(emotes, ":")[0] + ":" + cmd.Params[0], "twitch", width, thMult}
+				cmd.Params = []string{"false", strings.Split(emotes, ":")[0] + ";" + cmd.Params[0], "twitch", width, thMult}
 			} else {
-				cmd.Params = []string{"false", ":" + cmd.Params[0], "ffzbttv", width, thMult}
+				cmd.Params = []string{"false", url + ";" + cmd.Params[0], "ffzbttv", width, thMult}
 			}
 			if cmd.Name == "asciify~" {
 				cmd.Params[0] = "true"
@@ -293,9 +301,14 @@ func (bot *Bot) Asciify(params []string) error {
 	var url string
 	var emote string
 	var err error
-	split := strings.Split(params[1], ":")
+	split := strings.Split(params[1], ";")
 	emote = split[1]
-	url, err = FfzBttv(emote)
+	if split[0] == "" {
+		url, err = FfzBttv(emote)
+	} else {
+		url = split[0]
+		fmt.Println(url)
+	}
 	switch params[2] {
 	case "twitch":
 		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + split[0] + "/3.0"
