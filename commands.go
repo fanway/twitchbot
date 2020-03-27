@@ -307,7 +307,6 @@ func (bot *Bot) Asciify(params []string) error {
 		url, err = FfzBttv(emote)
 	} else {
 		url = split[0]
-		fmt.Println(url)
 	}
 	switch params[2] {
 	case "twitch":

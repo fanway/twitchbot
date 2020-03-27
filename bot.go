@@ -115,6 +115,17 @@ type Ffz struct {
 	} `json:"sets"`
 }
 
+type TwitchEmotes []struct {
+	ID             int    `json:"id"`
+	Width          int    `json:"width"`
+	Height         int    `json:"height"`
+	State          string `json:"state"`
+	Regex          string `json:"regex"`
+	EmoticonSet    int    `json:"emoticon_set"`
+	URL            string `json:"url"`
+	SubscriberOnly bool   `json:"subscriber_only"`
+}
+
 type bttvGlobal []struct {
 	ID        string `json:"id"`
 	Code      string `json:"code"`
@@ -129,13 +140,12 @@ func (bot *Bot) Connect(wg *sync.WaitGroup) {
 	if err != nil {
 		fmt.Printf("Unable to connect!")
 	}
-	fmt.Printf("connected to %s\n", bot.Channel)
 	fmt.Fprintf(bot.Conn, "CAP REQ :twitch.tv/tags\r\n")
 	fmt.Fprintf(bot.Conn, "PASS %s\r\n", bot.OAuth)
 	fmt.Fprintf(bot.Conn, "NICK %s\r\n", bot.Name)
 	fmt.Fprintf(bot.Conn, "JOIN %s\r\n", bot.Channel)
+	fmt.Printf("connected to %s\n", bot.Channel)
 	wg.Add(1)
-	go bot.ffzBttvInit()
 	bot.initCommands()
 	go bot.reader(wg)
 }
@@ -285,7 +295,7 @@ func (bot *Bot) ChangeAuthority(username, level string) {
 	bot.Authority = authorityInit()
 }
 
-func (bot *Bot) ffzBttvInit() {
+func (bot *Bot) updateEmotes() {
 	db := ConnectDb()
 	defer db.Close()
 	tx, err := db.Begin()
@@ -348,6 +358,30 @@ func (bot *Bot) ffzBttvInit() {
 			fmt.Println(err)
 		}
 	}
+
+	twitchUrl := "https://api.twitch.tv/api/channels/" + bot.Channel[1:] + "/product"
+	req, _ = http.NewRequest("GET", twitchUrl, nil)
+	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID_"))
+	var tempTwitch map[string]json.RawMessage
+	err = RequestJSON(req, 10, &tempTwitch)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	var twitch TwitchEmotes
+	if err := json.Unmarshal(tempTwitch["emoticons"], &twitch); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	for _, v := range twitch {
+		url := strings.Replace(v.URL, "/1.0", "/3.0", 1)
+		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", url, v.Regex)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
 	tx.Commit()
 }
 

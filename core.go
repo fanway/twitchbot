@@ -281,10 +281,6 @@ func AsciifyRequest(url string, width int, reverse bool, thMult float32) (string
 
 func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 	args := strings.Split(str, " ")
-	if len(args) < 2 {
-		fmt.Println("Not enough args")
-	}
-
 	command := args[0]
 	args = args[1:]
 
@@ -338,6 +334,12 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			console.commandsBuffer = console.commandsBuffer[:0]
 			console.commandsBufferCounter = 0
 		}
+	case "loademotes":
+		if len(botInstances) == 0 {
+			fmt.Println("You are not connected to any channel")
+			break
+		}
+		go botInstances[console.currentChannel].updateEmotes()
 	}
 }
 
