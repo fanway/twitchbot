@@ -111,7 +111,9 @@ func (console *Console) processConsole() (string, int) {
 			prefixBuffer = prefixBuffer[:0]
 			tabCount = 0
 		case ENTER:
-			console.commandsBuffer = append(console.commandsBuffer, state)
+			if len(console.commandsBuffer) == 0 || state != console.commandsBuffer[len(console.commandsBuffer)-1] {
+				console.commandsBuffer = append(console.commandsBuffer, state)
+			}
 			console.commandsBufferCounter = len(console.commandsBuffer)
 			fmt.Println("")
 			return state, ENTER
