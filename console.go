@@ -74,9 +74,11 @@ func processTab(state *string, buffer *[]string, tabCount *int) {
 
 func createPrefixBuffer(state string, console *Console) []string {
 	var prefixBuffer []string
+	prefixMap := make(map[string]bool)
 	for _, s := range console.commandsBuffer {
-		if strings.HasPrefix(s, state) && s != state {
+		if strings.HasPrefix(s, state) && !prefixMap[s] {
 			prefixBuffer = append(prefixBuffer, s)
+			prefixMap[s] = true
 		}
 	}
 	prefixBuffer = append(prefixBuffer, state)
