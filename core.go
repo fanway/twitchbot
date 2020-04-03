@@ -340,6 +340,20 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			break
 		}
 		go botInstances[console.currentChannel].updateEmotes()
+	case "send":
+		if len(args) < 1 {
+			fmt.Println("write message")
+			break
+		}
+		if console.currentChannel == "#" {
+			fmt.Println("connect to chat")
+			break
+		}
+		str := args[0]
+		for i := 1; i < len(args); i++ {
+			str += " " + args[i]
+		}
+		botInstances[console.currentChannel].SendMessage(str)
 	}
 }
 
