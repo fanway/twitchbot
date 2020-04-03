@@ -19,7 +19,7 @@ func add(m map[string]map[string]int, first, second string) {
 
 func (bot *Bot) Markov(params []string) error {
 	msg := ""
-	file, err := os.Open("#" + params[0] + ".log")
+	file, err := os.Open("#" + bot.Channel + ".log")
 	defer file.Close()
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (bot *Bot) Markov(params []string) error {
 		// parse message
 		str := strings.Split(strings.Split(line, "]")[1], ": ")[1]
 		sp := strings.Split(str, " ")
-		if len(sp) < 1 {
+		if len(sp) < 3 {
 			continue
 		}
 		// add special word
