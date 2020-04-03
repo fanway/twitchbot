@@ -326,8 +326,8 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			fmt.Println("Provide valid channel name to which bot is currently connected")
 		}
 	case "clear":
-		if len(args) != 1 {
-			fmt.Println("What should i clear???")
+		if len(args) == 0 {
+			fmt.Print("\033[H\033[J")
 			break
 		}
 		if args[0] == "buffer" {
