@@ -349,3 +349,12 @@ func (bot *Bot) Asciify(params []string) error {
 	bot.SendMessage(asciifiedImage)
 	return nil
 }
+
+func (bot *Bot) Markov(params []string) error {
+	msg, err := Markov(bot.Channel)
+	if err != nil {
+		return err
+	}
+	bot.SendMessage("@" + params[0] + " " + msg)
+	return nil
+}

@@ -354,6 +354,17 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			str += " " + args[i]
 		}
 		botInstances[console.currentChannel].SendMessage(str)
+	case "markov":
+		if len(args) != 1 {
+			fmt.Println("something went wrong")
+			break
+		}
+		msg, err := Markov(args[0])
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		fmt.Println(msg)
 	}
 }
 

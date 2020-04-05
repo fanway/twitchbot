@@ -17,12 +17,12 @@ func add(m map[string]map[string]int, first, second string) {
 	child[second]++
 }
 
-func (bot *Bot) Markov(params []string) error {
+func Markov(channel string) (string, error) {
 	msg := ""
-	file, err := os.Open("#" + bot.Channel + ".log")
+	file, err := os.Open("#" + channel + ".log")
 	defer file.Close()
 	if err != nil {
-		return err
+		return "", err
 	}
 	scanner := bufio.NewScanner(file)
 	i := 0
@@ -47,7 +47,7 @@ func (bot *Bot) Markov(params []string) error {
 	text := []string{"Begin"}
 	for {
 		if text[len(text)-1] == "End" {
-			if len(text) >= 7 {
+			if len(text) >= 10 {
 				break
 			}
 			text = []string{"Begin"}
@@ -73,6 +73,5 @@ func (bot *Bot) Markov(params []string) error {
 	for i := range text {
 		msg += " " + text[i]
 	}
-	bot.SendMessage("@" + params[0] + " " + msg)
-	return nil
+	return msg, nil
 }
