@@ -25,10 +25,8 @@ func Markov(channel string) (string, error) {
 		return "", err
 	}
 	scanner := bufio.NewScanner(file)
-	i := 0
 	m := make(map[string]map[string]int)
 	for scanner.Scan() {
-		i++
 		line := scanner.Text()
 		// parse message
 		str := strings.Split(strings.Split(line, "]")[1], ": ")[1]
@@ -40,7 +38,7 @@ func Markov(channel string) (string, error) {
 		add(m, "Begin", sp[0])
 		add(m, sp[len(sp)-1], "End")
 		// add words in message
-		for j := 1; j < len(sp)-1; j++ {
+		for j := 0; j < len(sp)-1; j++ {
 			add(m, sp[j], sp[j+1])
 		}
 	}
@@ -69,8 +67,7 @@ func Markov(channel string) (string, error) {
 		text = append(text, randSlice[rand.Intn(len(randSlice))])
 	}
 	msg = text[1]
-	text = text[2 : len(text)-1]
-	for i := range text {
+	for i := 2; i < len(text)-1; i++ {
 		msg += " " + text[i]
 	}
 	return msg, nil
