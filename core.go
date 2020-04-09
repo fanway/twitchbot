@@ -290,7 +290,9 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			fmt.Println("Provide channel name")
 			break
 		}
-		go StartBot(args[0], botInstances)
+		if _, ok := botInstances[args[0]]; !ok {
+			go StartBot(args[0], botInstances)
+		}
 		console.currentChannel = args[0]
 	case "find":
 		if len(args) != 1 {
@@ -313,6 +315,11 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			fmt.Println("Provide channel name")
 			break
 		}
+		if _, ok := botInstances[args[0]]; !ok {
+			fmt.Println("No such channel")
+			break
+		}
+		botInstances[args[0]].Disconnect()
 		delete(botInstances, args[0])
 		console.currentChannel = "#"
 	case "change":

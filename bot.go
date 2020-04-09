@@ -32,17 +32,18 @@ type Utils struct {
 }
 
 type Bot struct {
-	Channel   string
-	Name      string
-	Port      string
-	OAuth     string
-	Server    string
-	Conn      net.Conn
-	File      *os.File
-	Authority map[string]int
-	Status    string
-	Commands  map[string]*Command
-	Utils     Utils
+	Channel     string
+	Name        string
+	Port        string
+	OAuth       string
+	Server      string
+	Conn        net.Conn
+	File        *os.File
+	StopChannel chan struct{}
+	Authority   map[string]int
+	Status      string
+	Commands    map[string]*Command
+	Utils       Utils
 }
 
 type Bttv struct {
@@ -134,7 +135,7 @@ type bttvGlobal []struct {
 }
 
 // connects to twitch chat
-func (bot *Bot) Connect(wg *sync.WaitGroup) {
+func (bot *Bot) Connect() {
 	var err error
 	bot.Conn, err = net.Dial("tcp", bot.Server+":"+bot.Port)
 	if err != nil {
@@ -145,9 +146,15 @@ func (bot *Bot) Connect(wg *sync.WaitGroup) {
 	fmt.Fprintf(bot.Conn, "NICK %s\r\n", bot.Name)
 	fmt.Fprintf(bot.Conn, "JOIN %s\r\n", bot.Channel)
 	fmt.Printf("connected to %s\n", bot.Channel)
+	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	bot.initCommands()
 	go bot.reader(wg)
+	wg.Wait()
+}
+
+func (bot *Bot) Disconnect() {
+	close(bot.StopChannel)
 }
 
 func (bot *Bot) Pong(line string) {
@@ -162,18 +169,22 @@ func (bot *Bot) SendMessage(msg string) {
 // reader and parser
 func (bot *Bot) reader(wg *sync.WaitGroup) {
 	tp := textproto.NewReader(bufio.NewReader(bot.Conn))
-	w := bufio.NewWriter(bot.File)
 	logChan := make(chan Message)
-	go logsWriter(w, logChan, wg)
+	defer wg.Done()
+	go bot.logsWriter(logChan)
 	for {
-		line, err := tp.ReadLine()
-		if err != nil {
-			fmt.Println(err)
-			break
+		select {
+		case <-bot.StopChannel:
+			return
+		default:
+			line, err := tp.ReadLine()
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+			// parsing chat
+			go bot.parseChat(line, logChan)
 		}
-		// parsing chat
-		go bot.parseChat(line, w, logChan)
-		defer wg.Done()
 	}
 }
 
@@ -182,18 +193,20 @@ type Message struct {
 	Text     string
 }
 
-func logsWriter(w *bufio.Writer, logChan <-chan Message, wg *sync.WaitGroup) {
+func (bot *Bot) logsWriter(logChan <-chan Message) {
+	w := bufio.NewWriter(bot.File)
 	for {
 		select {
 		case message := <-logChan:
 			fmt.Fprintf(w, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05 -0700 MST"), message.Username, message.Text)
 			w.Flush()
+		case <-bot.StopChannel:
+			return
 		}
-		defer wg.Done()
 	}
 }
 
-func (bot *Bot) parseChat(line string, w *bufio.Writer, logChan chan<- Message) {
+func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 	if strings.Contains(line, "PRIVMSG") {
 		line := line[1:]
 		userdata := strings.Split(line, ".tmi.twitch.tv PRIVMSG "+bot.Channel)
@@ -386,7 +399,6 @@ func (bot *Bot) updateEmotes() {
 }
 
 func StartBot(channel string, botInstances map[string]*Bot) {
-	wg := new(sync.WaitGroup)
 	logfile, err := os.OpenFile(channel+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Fatal(err)
@@ -394,16 +406,16 @@ func StartBot(channel string, botInstances map[string]*Bot) {
 	defer logfile.Close()
 	m := authorityInit()
 	bot := Bot{
-		Channel:   channel,
-		Name:      "funwayz",
-		Port:      "6667",
-		OAuth:     os.Getenv("TWITCH_OAUTH_ENV"),
-		Server:    "irc.twitch.tv",
-		File:      logfile,
-		Conn:      nil,
-		Authority: m,
+		Channel:     channel,
+		Name:        "funwayz",
+		Port:        "6667",
+		OAuth:       os.Getenv("TWITCH_OAUTH_ENV"),
+		Server:      "irc.twitch.tv",
+		File:        logfile,
+		Conn:        nil,
+		StopChannel: make(chan struct{}),
+		Authority:   m,
 	}
 	botInstances[channel] = &bot
-	bot.Connect(wg)
-	wg.Wait()
+	bot.Connect()
 }
