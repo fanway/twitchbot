@@ -129,8 +129,12 @@ func (console *Console) processConsole() (string, int) {
 				case 'A':
 					if len(console.commandsBuffer) > 0 {
 						if len(prefixBuffer) == 0 {
-							prefixBuffer = createPrefixBuffer(state, console)
-							console.commandsBufferCounter = len(prefixBuffer) - 1
+							if state != "" {
+								prefixBuffer = createPrefixBuffer(state, console)
+								console.commandsBufferCounter = len(prefixBuffer) - 1
+							} else {
+								prefixBuffer = console.commandsBuffer
+							}
 						}
 						//up
 						if console.commandsBufferCounter != 0 {
@@ -141,8 +145,12 @@ func (console *Console) processConsole() (string, int) {
 				case 'B':
 					if len(console.commandsBuffer) > 0 {
 						if len(prefixBuffer) == 0 {
-							prefixBuffer = createPrefixBuffer(state, console)
-							console.commandsBufferCounter = len(prefixBuffer) - 1
+							if state != "" {
+								prefixBuffer = createPrefixBuffer(state, console)
+								console.commandsBufferCounter = len(prefixBuffer) - 1
+							} else {
+								prefixBuffer = console.commandsBuffer
+							}
 						}
 						//down
 						if console.commandsBufferCounter >= len(prefixBuffer)-1 {
