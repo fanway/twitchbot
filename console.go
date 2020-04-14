@@ -76,7 +76,7 @@ func createPrefixBuffer(state string, console *Console) []string {
 	var prefixBuffer []string
 	prefixMap := make(map[string]bool)
 	for _, s := range console.commandsBuffer {
-		if strings.HasPrefix(s, state) && !prefixMap[s] {
+		if state == "" || strings.HasPrefix(s, state) && !prefixMap[s] {
 			prefixBuffer = append(prefixBuffer, s)
 			prefixMap[s] = true
 		}
@@ -129,12 +129,8 @@ func (console *Console) processConsole() (string, int) {
 				case 'A':
 					if len(console.commandsBuffer) > 0 {
 						if len(prefixBuffer) == 0 {
-							if state != "" {
-								prefixBuffer = createPrefixBuffer(state, console)
-								console.commandsBufferCounter = len(prefixBuffer) - 1
-							} else {
-								prefixBuffer = console.commandsBuffer
-							}
+							prefixBuffer = createPrefixBuffer(state, console)
+							console.commandsBufferCounter = len(prefixBuffer) - 1
 						}
 						//up
 						if console.commandsBufferCounter != 0 {
@@ -145,12 +141,8 @@ func (console *Console) processConsole() (string, int) {
 				case 'B':
 					if len(console.commandsBuffer) > 0 {
 						if len(prefixBuffer) == 0 {
-							if state != "" {
-								prefixBuffer = createPrefixBuffer(state, console)
-								console.commandsBufferCounter = len(prefixBuffer) - 1
-							} else {
-								prefixBuffer = console.commandsBuffer
-							}
+							prefixBuffer = createPrefixBuffer(state, console)
+							console.commandsBufferCounter = len(prefixBuffer) - 1
 						}
 						//down
 						if console.commandsBufferCounter >= len(prefixBuffer)-1 {
