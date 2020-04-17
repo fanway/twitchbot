@@ -45,18 +45,18 @@ func SetTerm() {
 	}
 }
 
-func processTab(state *string, buffer *[]string, tabCount *int) {
+func processTab(state *string, buffer *Buffer) {
 	args := strings.Split(*state, " ")
 
 	command := args[0]
 	args = args[1:]
 
 	*state = command + " "
-	if len(*buffer) != 0 {
-		*tabCount = (*tabCount + 1) % len(*buffer)
-		*state += (*buffer)[*tabCount]
+	if !buffer.Empty() {
+		*state += buffer.Cycle()
 		return
 	}
+
 	prefix := "%"
 	if len(args) > 0 {
 		prefix = args[0] + "%"
@@ -64,32 +64,34 @@ func processTab(state *string, buffer *[]string, tabCount *int) {
 
 	switch command {
 	case "find":
-		*buffer = PersonsList(prefix)
-		if len(*buffer) == 0 {
-			*buffer = append(*buffer, args[0])
+		buffer.Append(PersonsList(prefix))
+		if buffer.Empty() {
+			buffer.Add(args[0])
 		}
-		*state += (*buffer)[*tabCount]
+		*state += buffer.Cycle()
 	}
 }
 
-func createPrefixBuffer(state string, console *Console) []string {
-	var prefixBuffer []string
-	prefixMap := make(map[string]bool)
-	for _, s := range console.commandsBuffer {
-		if state == "" || strings.HasPrefix(s, state) && !prefixMap[s] {
-			prefixBuffer = append(prefixBuffer, s)
-			prefixMap[s] = true
+func createPrefixBuffer(state string, commandsBuffer *Buffer) Buffer {
+	var prefixBuffer Buffer
+	prefixMap := make(map[string]int)
+	for _, s := range commandsBuffer.buffer {
+		prefixMap[s]++
+	}
+	for _, s := range commandsBuffer.buffer {
+		prefixMap[s]--
+		if state == "" || strings.HasPrefix(s, state) && prefixMap[s] == 0 {
+			prefixBuffer.Add(s)
 		}
 	}
-	prefixBuffer = append(prefixBuffer, state)
+	prefixBuffer.Add(state)
 	return prefixBuffer
 }
 
 func (console *Console) processConsole() (string, int) {
 	var state string
-	var tabBuffer []string
-	var tabCount int
-	var prefixBuffer []string
+	var tabBuffer Buffer
+	var prefixBuffer Buffer
 	var arrowPointer int
 	var arrowState string
 	for {
@@ -109,47 +111,44 @@ func (console *Console) processConsole() (string, int) {
 					}
 				}
 			}
-			tabBuffer = tabBuffer[:0]
-			prefixBuffer = prefixBuffer[:0]
-			tabCount = 0
+			tabBuffer.Clear()
+			prefixBuffer.Clear()
 		case ENTER:
-			if len(console.commandsBuffer) == 0 || state != console.commandsBuffer[len(console.commandsBuffer)-1] {
-				console.commandsBuffer = append(console.commandsBuffer, state)
+			if console.commandsBuffer.Empty() || state != console.commandsBuffer.Back() {
+				console.commandsBuffer.Add(state)
 			}
-			console.commandsBufferCounter = len(console.commandsBuffer)
+			console.commandsBuffer.index = console.commandsBuffer.Size()
 			fmt.Println("")
 			return state, ENTER
 		case TAB:
-			processTab(&state, &tabBuffer, &tabCount)
+			processTab(&state, &tabBuffer)
 		case ESC:
 			tempFirst := getChar(os.Stdin)
 			if tempFirst == '[' {
 				tempSecond := getChar(os.Stdin)
 				switch tempSecond {
 				case 'A':
-					if len(console.commandsBuffer) > 0 {
-						if len(prefixBuffer) == 0 {
-							prefixBuffer = createPrefixBuffer(state, console)
-							console.commandsBufferCounter = len(prefixBuffer) - 1
+					if !console.commandsBuffer.Empty() {
+						if prefixBuffer.Empty() {
+							prefixBuffer = createPrefixBuffer(state, &console.commandsBuffer)
 						}
 						//up
-						if console.commandsBufferCounter != 0 {
-							console.commandsBufferCounter--
-							state = prefixBuffer[console.commandsBufferCounter]
+						if prefixBuffer.index != 0 {
+							prefixBuffer.index--
+							state = prefixBuffer.Get()
 						}
 					}
 				case 'B':
-					if len(console.commandsBuffer) > 0 {
-						if len(prefixBuffer) == 0 {
-							prefixBuffer = createPrefixBuffer(state, console)
-							console.commandsBufferCounter = len(prefixBuffer) - 1
+					if !console.commandsBuffer.Empty() {
+						if prefixBuffer.Empty() {
+							prefixBuffer = createPrefixBuffer(state, &console.commandsBuffer)
 						}
 						//down
-						if console.commandsBufferCounter >= len(prefixBuffer)-1 {
-							state = prefixBuffer[len(prefixBuffer)-1]
+						if prefixBuffer.index >= prefixBuffer.Size()-1 {
+							state = prefixBuffer.Back()
 						} else {
-							console.commandsBufferCounter++
-							state = prefixBuffer[console.commandsBufferCounter]
+							prefixBuffer.index++
+							state = prefixBuffer.Get()
 						}
 					}
 				case 'D':
@@ -171,7 +170,7 @@ func (console *Console) processConsole() (string, int) {
 		default:
 			n := len(state) - arrowPointer - 1
 			state = state[:n+1] + string(ch) + state[n+1:]
-			prefixBuffer = prefixBuffer[:0]
+			prefixBuffer.Clear()
 		}
 	}
 }

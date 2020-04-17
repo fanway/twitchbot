@@ -338,8 +338,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			break
 		}
 		if args[0] == "buffer" {
-			console.commandsBuffer = console.commandsBuffer[:0]
-			console.commandsBufferCounter = 0
+			console.commandsBuffer.Clear()
 		}
 	case "loademotes":
 		if len(botInstances) == 0 {
@@ -376,9 +375,8 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 }
 
 type Console struct {
-	commandsBuffer        []string
-	commandsBufferCounter int
-	currentChannel        string
+	commandsBuffer Buffer
+	currentChannel string
 }
 
 func main() {
