@@ -280,97 +280,101 @@ func AsciifyRequest(url string, width int, reverse bool, thMult float32) (string
 }
 
 func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
-	args := strings.Split(str, " ")
-	command := args[0]
-	args = args[1:]
+	commandsChain := strings.Split(str, "|")
+	for _, s := range commandsChain {
+		s = strings.Trim(s, " ")
+		args := strings.Split(s, " ")
+		command := args[0]
+		args = args[1:]
 
-	switch command {
-	case "connect":
-		if len(args) != 1 {
-			fmt.Println("Provide channel name")
-			break
-		}
-		if _, ok := botInstances[args[0]]; !ok {
-			go StartBot(args[0], botInstances)
-		}
-		console.currentChannel = args[0]
-	case "find":
-		if len(args) != 1 {
-			fmt.Println("Provide channel name")
-			break
-		}
-		if args[0] == "list" {
-			rows := PersonsList("%")
-			for i := range rows {
-				fmt.Print(rows[i] + " ")
+		switch command {
+		case "connect":
+			if len(args) != 1 {
+				fmt.Println("Provide channel name")
+				break
 			}
-			fmt.Println("")
-		} else {
-			findPerson(args[0])
+			if _, ok := botInstances[args[0]]; !ok {
+				go StartBot(args[0], botInstances)
+			}
+			console.currentChannel = args[0]
+		case "find":
+			if len(args) != 1 {
+				fmt.Println("Provide channel name")
+				break
+			}
+			if args[0] == "list" {
+				rows := PersonsList("%")
+				for i := range rows {
+					fmt.Print(rows[i] + " ")
+				}
+				fmt.Println("")
+			} else {
+				findPerson(args[0])
+			}
+		case "asciify":
+			//fmt.Println(asciify(args))
+		case "disconnect":
+			if len(args) != 1 {
+				fmt.Println("Provide channel name")
+				break
+			}
+			if _, ok := botInstances[args[0]]; !ok {
+				fmt.Println("No such channel")
+				break
+			}
+			botInstances[args[0]].Disconnect()
+			delete(botInstances, args[0])
+			console.currentChannel = "#"
+		case "change":
+			if len(args) != 3 {
+				fmt.Println("Provide valid args")
+				break
+			}
+			if _, ok := botInstances[args[0]]; ok {
+				botInstances[args[0]].ChangeAuthority(args[1], args[2])
+			} else {
+				fmt.Println("Provide valid channel name to which bot is currently connected")
+			}
+		case "clear":
+			if len(args) == 0 {
+				fmt.Print("\033[H\033[J")
+				break
+			}
+			if args[0] == "buffer" {
+				console.commandsBuffer.Clear()
+			}
+		case "loademotes":
+			if len(botInstances) == 0 {
+				fmt.Println("You are not connected to any channel")
+				break
+			}
+			go botInstances[console.currentChannel].updateEmotes()
+		case "send":
+			if len(args) < 1 {
+				fmt.Println("write message")
+				break
+			}
+			if console.currentChannel == "#" {
+				fmt.Println("connect to chat")
+				break
+			}
+			str := args[0]
+			for i := 1; i < len(args); i++ {
+				str += " " + args[i]
+			}
+			botInstances[console.currentChannel].SendMessage(str)
+		case "markov":
+			if len(args) != 1 {
+				fmt.Println("something went wrong")
+				break
+			}
+			msg, err := Markov(args[0])
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+			fmt.Println(msg)
 		}
-	case "asciify":
-		//fmt.Println(asciify(args))
-	case "disconnect":
-		if len(args) != 1 {
-			fmt.Println("Provide channel name")
-			break
-		}
-		if _, ok := botInstances[args[0]]; !ok {
-			fmt.Println("No such channel")
-			break
-		}
-		botInstances[args[0]].Disconnect()
-		delete(botInstances, args[0])
-		console.currentChannel = "#"
-	case "change":
-		if len(args) != 3 {
-			fmt.Println("Provide valid args")
-			break
-		}
-		if _, ok := botInstances[args[0]]; ok {
-			botInstances[args[0]].ChangeAuthority(args[1], args[2])
-		} else {
-			fmt.Println("Provide valid channel name to which bot is currently connected")
-		}
-	case "clear":
-		if len(args) == 0 {
-			fmt.Print("\033[H\033[J")
-			break
-		}
-		if args[0] == "buffer" {
-			console.commandsBuffer.Clear()
-		}
-	case "loademotes":
-		if len(botInstances) == 0 {
-			fmt.Println("You are not connected to any channel")
-			break
-		}
-		go botInstances[console.currentChannel].updateEmotes()
-	case "send":
-		if len(args) < 1 {
-			fmt.Println("write message")
-			break
-		}
-		if console.currentChannel == "#" {
-			fmt.Println("connect to chat")
-			break
-		}
-		str := args[0]
-		for i := 1; i < len(args); i++ {
-			str += " " + args[i]
-		}
-		botInstances[console.currentChannel].SendMessage(str)
-	case "markov":
-		if len(args) != 1 {
-			fmt.Println("something went wrong")
-			break
-		}
-		msg, err := Markov(args[0])
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
-		fmt.Println(msg)
 	}
 }
 

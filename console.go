@@ -45,18 +45,14 @@ func SetTerm() {
 	}
 }
 
-func processTab(state *string, buffer *Buffer) {
-	args := strings.Split(*state, " ")
+func processTab(state string, buffer *Buffer) string {
+	state = strings.Trim(state, " ")
+	args := strings.Split(state, " ")
 
 	command := args[0]
 	args = args[1:]
 
-	*state = command + " "
-	if !buffer.Empty() {
-		*state += buffer.Cycle()
-		return
-	}
-
+	newState := command + " "
 	prefix := "%"
 	if len(args) > 0 {
 		prefix = args[0] + "%"
@@ -64,11 +60,15 @@ func processTab(state *string, buffer *Buffer) {
 
 	switch command {
 	case "find":
-		buffer.Append(PersonsList(prefix))
 		if buffer.Empty() {
-			buffer.Add(args[0])
+			buffer.Append(PersonsList(prefix))
+			if buffer.Empty() {
+				buffer.Add(args[0])
+			}
 		}
-		*state += buffer.Cycle()
+		return newState + buffer.Cycle()
+	default:
+		return newState
 	}
 }
 
@@ -86,6 +86,10 @@ func createPrefixBuffer(state string, commandsBuffer *Buffer) Buffer {
 	}
 	prefixBuffer.Add(state)
 	return prefixBuffer
+}
+
+func IsLetter(char byte) bool {
+	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z'
 }
 
 func (console *Console) processConsole() (string, int) {
@@ -121,7 +125,34 @@ func (console *Console) processConsole() (string, int) {
 			fmt.Println("")
 			return state, ENTER
 		case TAB:
-			processTab(&state, &tabBuffer)
+			n := len(state) - arrowPointer
+			left, right := 0, 0
+			// find index of the first occurance of '|' character on the left
+			for left = n - 1; left > 0; left-- {
+				if state[left] == '|' {
+					// Trim any non letters
+					for left < len(state) && !IsLetter(state[left]) {
+						left++
+					}
+					break
+				}
+			}
+			if left == -1 {
+				left = 0
+			}
+			// find index of the first occurance of '|' character on the right
+			for right = n; right < len(state); right++ {
+				if state[right] == '|' {
+					// Trim any non letters
+					for !IsLetter(state[right]) {
+						right--
+					}
+					// for convenience to use in the slice ranges
+					right++
+					break
+				}
+			}
+			state = state[:left] + processTab(state[left:right], &tabBuffer) + state[right:]
 		case ESC:
 			tempFirst := getChar(os.Stdin)
 			if tempFirst == '[' {

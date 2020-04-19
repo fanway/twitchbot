@@ -14,8 +14,10 @@ func (b *Buffer) GetByIdx(index int) string {
 }
 
 func (b *Buffer) Clear() {
-	b.buffer = b.buffer[:0]
-	b.index = 0
+	if !b.Empty() {
+		b.buffer = b.buffer[:0]
+		b.index = 0
+	}
 }
 
 func (b *Buffer) Size() int {
