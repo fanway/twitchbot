@@ -9,12 +9,14 @@ import (
 )
 
 const (
-	TAB        = 9
-	ENTER      = 10
-	BACKSPACE  = 127
-	ESC        = 27
-	ARROW_UP   = "\033[A"
-	ARROW_DOWN = "\033[B"
+	TAB         = 9
+	ENTER       = 10
+	BACKSPACE   = 127
+	ESC         = 27
+	ARROW_UP    = 'A'
+	ARROW_DOWN  = 'B'
+	ARROW_LEFT  = 'D'
+	ARROW_RIGHT = 'C'
 )
 
 func Abs(x int) int {
@@ -158,7 +160,7 @@ func (console *Console) processConsole() (string, int) {
 			if tempFirst == '[' {
 				tempSecond := getChar(os.Stdin)
 				switch tempSecond {
-				case 'A':
+				case ARROW_UP:
 					if !console.commandsBuffer.Empty() {
 						if prefixBuffer.Empty() {
 							prefixBuffer = createPrefixBuffer(state, &console.commandsBuffer)
@@ -169,7 +171,7 @@ func (console *Console) processConsole() (string, int) {
 							state = prefixBuffer.Get()
 						}
 					}
-				case 'B':
+				case ARROW_DOWN:
 					if !console.commandsBuffer.Empty() {
 						if prefixBuffer.Empty() {
 							prefixBuffer = createPrefixBuffer(state, &console.commandsBuffer)
@@ -182,13 +184,13 @@ func (console *Console) processConsole() (string, int) {
 							state = prefixBuffer.Get()
 						}
 					}
-				case 'D':
+				case ARROW_LEFT:
 					if arrowPointer < len(state) {
 						//left
 						arrowPointer++
 						arrowState += "\033[D"
 					}
-				case 'C':
+				case ARROW_RIGHT:
 					if arrowPointer > 0 {
 						//right
 						arrowPointer--
@@ -202,6 +204,7 @@ func (console *Console) processConsole() (string, int) {
 			n := len(state) - arrowPointer - 1
 			state = state[:n+1] + string(ch) + state[n+1:]
 			prefixBuffer.Clear()
+			tabBuffer.Clear()
 		}
 	}
 }
