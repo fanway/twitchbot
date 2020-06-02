@@ -179,7 +179,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 		default:
 			line, err := tp.ReadLine()
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				break
 			}
 			// parsing chat
@@ -228,7 +228,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 		if messageLength >= 300 && messageLength <= 2000 {
 			pasteFile, err := os.OpenFile("paste.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			}
 			defer pasteFile.Close()
 			pasteWriter := bufio.NewWriter(pasteFile)
@@ -236,7 +236,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 		}
 
 		if usermessage[0] == '!' {
-			go bot.processCommands(usermessage, username, emotes)
+			bot.processCommands(usermessage, username, emotes)
 		}
 	} else if strings.HasPrefix(line, "PING") { // response to keep connection alive
 		bot.Pong(line)
@@ -251,13 +251,13 @@ func (bot *Bot) processCommands(message, username, emotes string) {
 	cmd, err = bot.ParseCommand(message, emotes, username, level)
 	if err != nil {
 		bot.Status = "Running"
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	err = cmd.ExecCommand(level)
 	if err != nil {
 		bot.Status = "Running"
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 }
@@ -265,11 +265,11 @@ func (bot *Bot) processCommands(message, username, emotes string) {
 func authorityInit() map[string]int {
 	file, err := ioutil.ReadFile("authority.txt")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	var m map[string]string
 	if err = json.Unmarshal(file, &m); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	mp := make(map[string]int)
 	for k := range m {
@@ -288,21 +288,21 @@ func authorityInit() map[string]int {
 func (bot *Bot) ChangeAuthority(username, level string) {
 	file, err := ioutil.ReadFile("authority.txt")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	var m map[string]string
 	if err = json.Unmarshal(file, &m); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	m[username] = level
 	newAuthority, err := json.Marshal(m)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	err = ioutil.WriteFile("authority.txt", newAuthority, 0644)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	bot.Authority = authorityInit()
@@ -313,20 +313,20 @@ func (bot *Bot) updateEmotes() {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	defer tx.Rollback()
 
 	_, err = tx.Exec("CREATE TABLE IF NOT EXISTS ffzbttv(url TEXT NOT NULL, code TEXT NOT NULL, UNIQUE (url) ON CONFLICT REPLACE);")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	ffzUrl := "https://api.frankerfacez.com/v1/room/" + bot.Channel[1:]
 	var ffz map[string]interface{}
 	req, _ := http.NewRequest("GET", ffzUrl, nil)
 	err = RequestJSON(req, 10, &ffz)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	room := ffz["room"].(map[string]interface{})
@@ -347,7 +347,7 @@ func (bot *Bot) updateEmotes() {
 		}
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", "https:"+s, name)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 
@@ -356,19 +356,19 @@ func (bot *Bot) updateEmotes() {
 	req, _ = http.NewRequest("GET", bttvUrl, nil)
 	err = RequestJSON(req, 10, &bttv)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	cdnUrl := "https://cdn.betterttv.net/emote/"
 	for _, u := range bttv.SharedEmotes {
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 	for _, u := range bttv.ChannelEmotes {
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 
@@ -378,12 +378,12 @@ func (bot *Bot) updateEmotes() {
 	var tempTwitch map[string]json.RawMessage
 	err = RequestJSON(req, 10, &tempTwitch)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	var twitch TwitchEmotes
 	if err := json.Unmarshal(tempTwitch["emoticons"], &twitch); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
@@ -391,7 +391,7 @@ func (bot *Bot) updateEmotes() {
 		url := strings.Replace(v.URL, "/1.0", "/3.0", 1)
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", url, v.Regex)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 

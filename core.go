@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -91,7 +92,7 @@ func findPerson(name string) {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	defer tx.Rollback()
@@ -105,29 +106,31 @@ func findPerson(name string) {
 		var iddata IdData
 		err := RequestJSON(req, 10, &iddata)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		id = iddata.Data[0].ID
 	}
 	url := "https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id
 	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 	var followers Followers
 	err = RequestJSON(req, 10, &followers)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	cursor := followers.Pagination.Cursor
 	for i := 0; i < followers.Total/100; i++ {
 		url = "https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id + "&after=" + cursor
 		req, _ = http.NewRequest("GET", url, nil)
+		req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
 		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 		var temp Followers
 		err = RequestJSON(req, 10, &temp)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		followers.Data = append(followers.Data, temp.Data...)
@@ -137,22 +140,24 @@ func findPerson(name string) {
 	_, err = tx.Exec("CREATE TEMPORARY TABLE Follow(Id INTEGER PRIMARY KEY, FromId TEXT, FromName TEXT, ToId TEXT, ToName TEXT, FollowedAt TEXT);")
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 
 	for _, d := range followers.Data {
 		_, err := tx.Exec("INSERT INTO temp.Follow(FromId, FromName, ToId, ToName, FollowedAt) values($1, $2, $3, $4, $5);", d.FromID, d.FromName, d.ToID, d.ToName, d.FollowedAt)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 
 	rows, err := tx.Query("SELECT * FROM temp.Follow tm WHERE NOT EXISTS (SELECT * FROM Followers t WHERE tm.FromId = t.FromId AND tm.ToId = t.Toid);")
 
 	defer rows.Close()
+	fmt.Println(name)
+	fmt.Println("-----------------------")
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	fmt.Println("New channels: ")
 	for rows.Next() {
@@ -164,12 +169,12 @@ func findPerson(name string) {
 		var followersAt string
 		err = rows.Scan(&idx, &fromId, &fromName, &toId, &toName, &followersAt)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 		fmt.Print(toName + " ")
 		_, err = tx.Exec("INSERT INTO Followers(FromId, FromName, ToId, ToName, FollowedAt) values($1, $2, $3, $4, $5);", fromId, fromName, toId, toName, followersAt)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 	fmt.Println("")
@@ -178,7 +183,7 @@ func findPerson(name string) {
 
 	defer rows.Close()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 
 	fmt.Println("Unfollowed channels: ")
@@ -187,12 +192,12 @@ func findPerson(name string) {
 		var toName string
 		err := rows.Scan(&idx, &toName)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 		fmt.Print(toName + " ")
 		_, err = tx.Exec("DELETE FROM Followers WHERE id=$1", strconv.Itoa(idx))
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 	fmt.Println("")
@@ -201,7 +206,7 @@ func findPerson(name string) {
 
 	defer rows.Close()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	name = strings.ToLower(name)
 	fmt.Println("Currently watching: ")
@@ -213,7 +218,7 @@ func findPerson(name string) {
 		var chatData ChatData
 		err = RequestJSON(req, 10, &chatData)
 		if err != nil {
-			//fmt.Println(err)
+			//log.Println(err)
 			continue
 		}
 
@@ -246,13 +251,13 @@ func PersonsList(prefix string) []string {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	defer tx.Rollback()
 	rows, err := tx.Query("SELECT DISTINCT FromName FROM Followers WHERE FromName LIKE $1;", prefix)
 	defer rows.Close()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	var buffer []string
 	for rows.Next() {
@@ -274,7 +279,7 @@ func AsciifyRequest(url string, width int, reverse bool, thMult float32) (string
 	defer res.Body.Close()
 	img, _, err := image.Decode(res.Body)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	return Braille(img, width, reverse, thMult), nil
 }
@@ -370,7 +375,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 			msg, err := Markov(args[0])
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				break
 			}
 			fmt.Println(msg)
@@ -385,7 +390,7 @@ type Console struct {
 
 func main() {
 	var console Console
-	//logChan := make(chan string)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	console.currentChannel = "#"
 	botInstaces := make(map[string]*Bot)
 	SetTerm()

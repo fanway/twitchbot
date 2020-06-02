@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -268,7 +269,7 @@ func FfzBttv(emote string) (string, error) {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	defer tx.Rollback()
 
@@ -286,7 +287,7 @@ func addEmote(url, code string) error {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	defer tx.Rollback()
 	_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", url, code)
