@@ -1,44 +1,12 @@
 package main
 
 import (
-	"database/sql"
 	"image"
 	"image/color"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 )
-
-func EmoteCache(reverse bool, url string, width int, rewrite bool, thMult float32, emote string) (string, error) {
-	db := ConnectDb()
-	defer db.Close()
-	tx, err := db.Begin()
-	if err != nil {
-		return "", err
-	}
-	defer tx.Rollback()
-	_, err = tx.Exec("CREATE TABLE IF NOT EXISTS emoteCache(emote TEXT NOT NULL, image TEXT NOT NULL DEFAULT '', reversedImage TEXT NOT NULL DEFAULT '', UNIQUE (emote) ON CONFLICT REPLACE);")
-	if err != nil {
-		return "", err
-	}
-	var str string
-	column := "image"
-	if reverse {
-		column = "reversedImage"
-	}
-	if err := tx.QueryRow("SELECT "+column+" FROM emoteCache WHERE emote=$l;", emote).Scan(&str); err == sql.ErrNoRows || rewrite || str == "" {
-		str, err = AsciifyRequest(url, width, reverse, thMult)
-		if err != nil {
-			return "", err
-		}
-		_, err = tx.Exec("INSERT INTO emoteCache(emote, "+column+") VALUES($1,$2);", emote, str)
-		if err != nil {
-			return "", err
-		}
-	}
-	tx.Commit()
-	return str, nil
-}
 
 func Braille(img image.Image, maxW int, reverse bool, thMult float32) string {
 	b := img.Bounds()

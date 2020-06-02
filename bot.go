@@ -68,54 +68,6 @@ type Bttv struct {
 	} `json:"sharedEmotes"`
 }
 
-type Ffz struct {
-	Room struct {
-		_ID            int         `json:"_id"`
-		CSS            interface{} `json:"css"`
-		DisplayName    string      `json:"display_name"`
-		ID             string      `json:"id"`
-		IsGroup        bool        `json:"is_group"`
-		ModUrls        interface{} `json:"mod_urls"`
-		ModeratorBadge interface{} `json:"moderator_badge"`
-		Set            int         `json:"set"`
-		TwitchID       int         `json:"twitch_id"`
-		UserBadges     struct {
-		} `json:"user_badges"`
-	} `json:"room"`
-	Sets struct {
-		IDX struct {
-			Type        int         `json:"_type"`
-			CSS         interface{} `json:"css"`
-			Description interface{} `json:"description"`
-			Emoticons   []struct {
-				CSS      interface{} `json:"css"`
-				Height   int         `json:"height"`
-				Hidden   bool        `json:"hidden"`
-				ID       int         `json:"id"`
-				Margins  interface{} `json:"margins"`
-				Modifier bool        `json:"modifier"`
-				Name     string      `json:"name"`
-				Offset   interface{} `json:"offset"`
-				Owner    struct {
-					ID          int    `json:"_id"`
-					DisplayName string `json:"display_name"`
-					Name        string `json:"name"`
-				} `json:"owner"`
-				Public bool `json:"public"`
-				Urls   struct {
-					One  string `json:"1,omitempty"`
-					Two  string `json:"2,omitempty"`
-					Four string `json:"4,omitempty"`
-				} `json:"urls,omitempty"`
-				Width int `json:"width"`
-			} `json:"emoticons"`
-			Icon  interface{} `json:"icon"`
-			ID    int         `json:"id"`
-			Title string      `json:"title"`
-		} `json:`
-	} `json:"sets"`
-}
-
 type TwitchEmotes []struct {
 	ID             int    `json:"id"`
 	Width          int    `json:"width"`
@@ -125,13 +77,6 @@ type TwitchEmotes []struct {
 	EmoticonSet    int    `json:"emoticon_set"`
 	URL            string `json:"url"`
 	SubscriberOnly bool   `json:"subscriber_only"`
-}
-
-type bttvGlobal []struct {
-	ID        string `json:"id"`
-	Code      string `json:"code"`
-	ImageType string `json:"imageType"`
-	UserID    string `json:"userId"`
 }
 
 // connects to twitch chat
