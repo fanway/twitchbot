@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -269,6 +270,103 @@ func PersonsList(prefix string) []string {
 	return buffer
 }
 
+type VodsChat struct {
+	Comments []Comments `json:"comments"`
+	Next     string     `json:"_next,omitempty"`
+}
+
+func (chat *VodsChat) parse() []string {
+	var messages []string
+	for _, comment := range chat.Comments {
+		username := comment.Commenter.DisplayName
+		time := comment.CreatedAt.Format("2006-01-02 15:04:05 -0700 MST")
+		msg := comment.Message.Body
+		messages = append(messages, fmt.Sprintf("[%s] %s: %s\n", time, username, msg))
+	}
+	return messages
+}
+
+type Commenter struct {
+	DisplayName string      `json:"display_name"`
+	ID          string      `json:"_id"`
+	Name        string      `json:"name"`
+	Type        string      `json:"type"`
+	Bio         interface{} `json:"bio"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+	Logo        string      `json:"logo"`
+}
+
+type UserBadges struct {
+	ID      string `json:"_id"`
+	Version string `json:"version"`
+}
+
+type VodMessage struct {
+	Body             string       `json:"body"`
+	Emoticons        []Emoticons  `json:"emoticons,omitempty"`
+	Fragments        []Fragments  `json:"fragments"`
+	IsAction         bool         `json:"is_action"`
+	UserBadges       []UserBadges `json:"user_badges,omitempty"`
+	UserColor        string       `json:"user_color,omitempty"`
+	UserNoticeParams interface{}  `json:"user_notice_params,omitempty"`
+}
+
+type Fragments struct {
+	Text     string   `json:"text"`
+	Emoticon Emoticon `json:"emoticon,omitempty"`
+}
+
+type Emoticon struct {
+	EmoticonID    string `json:"emoticon_id"`
+	EmoticonSetID string `json:"emoticon_set_id"`
+}
+
+type Emoticons struct {
+	ID    string `json:"_id"`
+	Begin int    `json:"begin"`
+	End   int    `json:"end"`
+}
+
+type Comments struct {
+	ID                   string     `json:"_id"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+	ChannelID            string     `json:"channel_id"`
+	ContentType          string     `json:"content_type"`
+	ContentID            string     `json:"content_id"`
+	ContentOffsetSeconds float64    `json:"content_offset_seconds"`
+	Commenter            Commenter  `json:"commenter"`
+	Source               string     `json:"source"`
+	State                string     `json:"state"`
+	Message              VodMessage `json:"message,omitempty"`
+}
+
+func getChatFromVods(videoId string) ([]string, error) {
+	url := "https://api.twitch.tv/v5/videos/" + videoId + "/comments?cursor="
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+	var vodsChat VodsChat
+	err := RequestJSON(req, 10, &vodsChat)
+	if err != nil {
+		return nil, err
+	}
+	messages := vodsChat.parse()
+	for vodsChat.Next != "" {
+		req, _ := http.NewRequest("GET", url+vodsChat.Next, nil)
+		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+		vodsChat = VodsChat{}
+		err := RequestJSON(req, 10, &vodsChat)
+		if err != nil {
+			return nil, err
+		}
+		newMessages := vodsChat.parse()
+		fmt.Println(newMessages)
+		messages = append(messages, newMessages...)
+	}
+	return messages, nil
+}
+
 func AsciifyRequest(url string, width int, reverse bool, thMult float32) (string, error) {
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
@@ -370,7 +468,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			botInstances[console.currentChannel].SendMessage(str)
 		case "markov":
 			if len(args) != 1 {
-				fmt.Println("something went wrong")
+				log.Println("something went wrong")
 				break
 			}
 			msg, err := Markov(args[0])
@@ -379,6 +477,58 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				break
 			}
 			fmt.Println(msg)
+		case "loadcomments":
+			if len(args) != 1 {
+				fmt.Println("something went wrong")
+				break
+			}
+			var err error
+			console.comments, err = getChatFromVods(args[0])
+			if err != nil {
+				log.Println(err)
+			}
+		case "sortcomments":
+			var timeStart time.Time
+			var timeEnd time.Time
+			if console.comments == nil {
+				fmt.Println("load some comments")
+				break
+			}
+			if len(args) == 1 {
+				timeEnd = time.Now()
+			} else if len(args) == 3 {
+				var err error
+				timeStart, timeEnd, err = ParseLogTime(args[1], args[2])
+				if err != nil {
+					log.Println(err)
+					break
+				}
+			} else {
+				break
+			}
+			username := args[0]
+			for _, comment := range console.comments {
+				str, err := LogsParse(comment, username, timeStart, timeEnd)
+				if err != nil {
+					continue
+				}
+				fmt.Print(str)
+			}
+		case "savechat":
+			if console.comments == nil {
+				fmt.Println("load some comments")
+				break
+			}
+			file, err := os.OpenFile("vod.log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			w := bufio.NewWriter(file)
+			for _, comment := range console.comments {
+				w.WriteString(comment)
+			}
+			defer file.Close()
 		}
 	}
 }
@@ -386,6 +536,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 type Console struct {
 	commandsBuffer Buffer
 	currentChannel string
+	comments       []string
 }
 
 func main() {

@@ -32,12 +32,13 @@ func checkForUrl(url string) string {
 
 func (bot *Bot) ParseCommand(message, emotes, username string, level int) (*Command, error) {
 	args := strings.Split(message, " ")
-	if args[0] == "!" {
-		return nil, errors.New("could not parse command")
-	}
 	if cmd, ok := bot.Commands[args[0][1:]]; ok {
 		if len(args) > 1 {
-			cmd.Params = args[1:]
+			if cmd.Name == "logs" {
+				cmd.Params = []string{message[strings.Index(message, " ")+1:]}
+			} else {
+				cmd.Params = args[1:]
+			}
 		}
 		if cmd.Name == "asciify" || cmd.Name == "asciify~" {
 			width := ""
@@ -162,6 +163,39 @@ func (bot *Bot) StopVoteCommand(params []string) error {
 	return nil
 }
 
+func ParseLogTime(start, end string) (time.Time, time.Time, error) {
+	layout := "2006-01-02 15:04:05 -0700 MST"
+	timeStart, err := time.Parse(layout, strings.TrimSpace(start)+":00 +0300 MSK")
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	timeEnd, err := time.Parse(layout, strings.TrimSpace(end)+":00 +0300 MSK")
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	return timeStart, timeEnd, nil
+}
+
+func LogsParse(str, username string, timeStart, timeEnd time.Time) (string, error) {
+	layout := "2006-01-02 15:04:05 -0700 MST"
+	var tt string
+	if strings.Contains(str, "[") {
+		tt = strings.Split(strings.Split(str, "[")[1], "]")[0]
+		timeq, err := time.Parse(layout, tt)
+		if err != nil {
+			return "", err
+		}
+		if timeq.Before(timeEnd) && timeq.After(timeStart) {
+			if strings.Count(str, ":") > 2 {
+				if strings.Contains(strings.Split(str, ":")[2], username) || username == "all" {
+					return str, nil
+				}
+			}
+		}
+	}
+	return "", errors.New("Nothing was found")
+}
+
 func (bot *Bot) LogsCommand(params []string) error {
 	if params == nil {
 		return errors.New("!logs: not enough params")
@@ -171,38 +205,23 @@ func (bot *Bot) LogsCommand(params []string) error {
 	if len(utt) < 3 {
 		return errors.New("!logs: wrong amount of params")
 	}
-	layout := "2006-01-02 15:04:05 -0700 MST"
 	username := utt[0]
-	timeStart, err := time.Parse(layout, "2019-"+strings.TrimSpace(utt[1])+":00 +0300 MSK")
-	if err != nil {
-		return err
-	}
-	timeEnd, err := time.Parse(layout, "2019-"+strings.TrimSpace(utt[2])+":00 +0300 MSK")
+	timeStart, timeEnd, err := ParseLogTime(utt[1], utt[2])
 	if err != nil {
 		return err
 	}
 	if _, err = bot.File.Seek(0, io.SeekStart); err != nil {
 		panic(err)
 	}
+	fmt.Println(username, timeStart, timeEnd)
 	r := bufio.NewScanner(bot.File)
-	var str string
-	var tt string
 	for r.Scan() {
-		str = r.Text()
-		if strings.Contains(str, "[") {
-			tt = strings.Split(strings.Split(str, "[")[1], "]")[0]
-			timeq, err := time.Parse(layout, tt)
-			if err != nil {
-				return err
-			}
-			if timeq.Before(timeEnd) && timeq.After(timeStart) {
-				if strings.Count(str, ":") > 2 {
-					if strings.Contains(strings.Split(str, ":")[2], username) || username == "all" {
-						bot.SendMessage(str)
-					}
-				}
-			}
+		str := r.Text()
+		parsedStr, err := LogsParse(str, username, timeStart, timeEnd)
+		if err != nil {
+			continue
 		}
+		bot.SendMessage(parsedStr)
 		if err := r.Err(); err != nil {
 			return err
 		}
