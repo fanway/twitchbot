@@ -279,7 +279,8 @@ func (chat *VodsChat) parse() []string {
 	var messages []string
 	for _, comment := range chat.Comments {
 		username := comment.Commenter.DisplayName
-		time := comment.CreatedAt.Format("2006-01-02 15:04:05 -0700 MST")
+		currentTime := time.Now()
+		time := comment.CreatedAt.In(currentTime.Location()).Format("2006-01-02 15:04:05 -0700 MST")
 		msg := comment.Message.Body
 		messages = append(messages, fmt.Sprintf("[%s] %s: %s\n", time, username, msg))
 	}
@@ -529,6 +530,12 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				w.WriteString(comment)
 			}
 			defer file.Close()
+		case "clearcomments":
+			if console.comments == nil {
+				fmt.Println("load some comments")
+				break
+			}
+			console.comments = nil
 		}
 	}
 }
