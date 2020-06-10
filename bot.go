@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -153,11 +154,11 @@ func (bot *Bot) logsWriter(logChan <-chan Message) {
 
 func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 	if strings.Contains(line, "PRIVMSG") {
-		line := line[1:]
-		userdata := strings.Split(line, ".tmi.twitch.tv PRIVMSG "+bot.Channel)
-		username := strings.Split(userdata[0], "@")[1]
-		emotes := strings.Split(strings.Split(userdata[0], "emotes=")[1], ";")[0]
-		usermessage := strings.Replace(userdata[1], " :", "", 1)
+		re := regexp.MustCompile(`emotes=(.*?);|@(.*?)\.tmi\.twitch\.tv|PRIVMSG.*?:(.*)`)
+		match := re.FindAllStringSubmatch(line[1:], -1)
+		username := match[1][2]
+		emotes := match[0][1]
+		usermessage := match[2][3]
 		logChan <- Message{username, usermessage}
 		messageLength := len(usermessage)
 		if bot.Status == "smartvote" && messageLength == 1 {
