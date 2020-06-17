@@ -61,7 +61,7 @@ type ChatData struct {
 	} `json:"chatters"`
 }
 
-func RequestJSON(req *http.Request, timeout int, obj interface{}) error {
+func requestJSON(req *http.Request, timeout int, obj interface{}) error {
 	client := &http.Client{Timeout: time.Second * time.Duration(timeout)}
 	res, err := client.Do(req)
 	if err != nil {
@@ -79,7 +79,7 @@ func RequestJSON(req *http.Request, timeout int, obj interface{}) error {
 	return nil
 }
 
-func ConnectDb() *sql.DB {
+func connectDb() *sql.DB {
 	db, err := sql.Open("sqlite3", "./data.db?_busy_timeout=5000&cache=shared&mode=rwc")
 	if err != nil {
 		panic(err)
@@ -89,7 +89,7 @@ func ConnectDb() *sql.DB {
 }
 
 func findPerson(name string) {
-	db := ConnectDb()
+	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -105,7 +105,7 @@ func findPerson(name string) {
 		req, _ := http.NewRequest("GET", url, nil)
 		req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
 		var iddata IdData
-		err := RequestJSON(req, 10, &iddata)
+		err := requestJSON(req, 10, &iddata)
 		if err != nil {
 			log.Println(err)
 			return
@@ -117,7 +117,7 @@ func findPerson(name string) {
 	req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 	var followers Followers
-	err = RequestJSON(req, 10, &followers)
+	err = requestJSON(req, 10, &followers)
 	if err != nil {
 		log.Println(err)
 		return
@@ -129,7 +129,7 @@ func findPerson(name string) {
 		req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
 		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 		var temp Followers
-		err = RequestJSON(req, 10, &temp)
+		err = requestJSON(req, 10, &temp)
 		if err != nil {
 			log.Println(err)
 			return
@@ -217,7 +217,7 @@ func findPerson(name string) {
 		url = "https://tmi.twitch.tv/group/user/" + strings.ToLower(toName) + "/chatters"
 		req, _ := http.NewRequest("GET", url, nil)
 		var chatData ChatData
-		err = RequestJSON(req, 10, &chatData)
+		err = requestJSON(req, 10, &chatData)
 		if err != nil {
 			//log.Println(err)
 			continue
@@ -247,8 +247,8 @@ func findPerson(name string) {
 	fmt.Println("-----------------------")
 }
 
-func PersonsList(prefix string) []string {
-	db := ConnectDb()
+func personsList(prefix string) []string {
+	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -348,7 +348,7 @@ func getChatFromVods(videoId string) ([]string, error) {
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 	var vodsChat VodsChat
-	err := RequestJSON(req, 10, &vodsChat)
+	err := requestJSON(req, 10, &vodsChat)
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +357,7 @@ func getChatFromVods(videoId string) ([]string, error) {
 		req, _ := http.NewRequest("GET", url+vodsChat.Next, nil)
 		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 		vodsChat = VodsChat{}
-		err := RequestJSON(req, 10, &vodsChat)
+		err := requestJSON(req, 10, &vodsChat)
 		if err != nil {
 			return nil, err
 		}
@@ -368,7 +368,7 @@ func getChatFromVods(videoId string) ([]string, error) {
 	return messages, nil
 }
 
-func AsciifyRequest(url string, width int, reverse bool, thMult float32) (string, error) {
+func asciifyRequest(url string, width int, reverse bool, thMult float32) (string, error) {
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
 	res, err := client.Do(req)
@@ -398,7 +398,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				break
 			}
 			if _, ok := botInstances[args[0]]; !ok {
-				go StartBot(args[0], botInstances)
+				go startBot(args[0], botInstances)
 			}
 			console.currentChannel = args[0]
 		case "find":
@@ -407,7 +407,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				break
 			}
 			if args[0] == "list" {
-				rows := PersonsList("%")
+				rows := personsList("%")
 				for i := range rows {
 					fmt.Print(rows[i] + " ")
 				}
@@ -435,7 +435,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				break
 			}
 			if _, ok := botInstances[args[0]]; ok {
-				botInstances[args[0]].ChangeAuthority(args[1], args[2])
+				botInstances[args[0]].changeAuthority(args[1], args[2])
 			} else {
 				fmt.Println("Provide valid channel name to which bot is currently connected")
 			}
@@ -499,7 +499,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				timeEnd = time.Now()
 			} else if len(args) == 3 {
 				var err error
-				timeStart, timeEnd, err = ParseLogTime(args[1], args[2])
+				timeStart, timeEnd, err = parseLogTime(args[1], args[2])
 				if err != nil {
 					log.Println(err)
 					break
@@ -509,7 +509,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 			username := args[0]
 			for _, comment := range console.comments {
-				str, err := LogsParse(comment, username, timeStart, timeEnd)
+				str, err := logsParse(comment, username, timeStart, timeEnd)
 				if err != nil {
 					continue
 				}
@@ -551,7 +551,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	console.currentChannel = "#"
 	botInstaces := make(map[string]*Bot)
-	SetTerm()
+	setTerm()
 	for {
 		args, status := console.processConsole()
 		switch status {

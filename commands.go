@@ -30,7 +30,7 @@ func checkForUrl(url string) string {
 	return ""
 }
 
-func (bot *Bot) ParseCommand(message, emotes, username string, level int) (*Command, error) {
+func (bot *Bot) parseCommand(message, emotes, username string, level int) (*Command, error) {
 	args := strings.Split(message, " ")
 	if cmd, ok := bot.Commands[args[0][1:]]; ok {
 		if len(args) > 1 {
@@ -163,7 +163,7 @@ func (bot *Bot) StopVoteCommand(params []string) error {
 	return nil
 }
 
-func ParseLogTime(start, end string) (time.Time, time.Time, error) {
+func parseLogTime(start, end string) (time.Time, time.Time, error) {
 	layout := "2006-01-02 15:04:05 -0700 MST"
 	timeStart, err := time.Parse(layout, strings.TrimSpace(start)+":00 +0300 MSK")
 	if err != nil {
@@ -176,7 +176,7 @@ func ParseLogTime(start, end string) (time.Time, time.Time, error) {
 	return timeStart, timeEnd, nil
 }
 
-func LogsParse(str, username string, timeStart, timeEnd time.Time) (string, error) {
+func logsParse(str, username string, timeStart, timeEnd time.Time) (string, error) {
 	layout := "2006-01-02 15:04:05 -0700 MST"
 	var tt string
 	if strings.Contains(str, "[") {
@@ -206,7 +206,7 @@ func (bot *Bot) LogsCommand(params []string) error {
 		return errors.New("!logs: wrong amount of params")
 	}
 	username := utt[0]
-	timeStart, timeEnd, err := ParseLogTime(utt[1], utt[2])
+	timeStart, timeEnd, err := parseLogTime(utt[1], utt[2])
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (bot *Bot) LogsCommand(params []string) error {
 	r := bufio.NewScanner(bot.File)
 	for r.Scan() {
 		str := r.Text()
-		parsedStr, err := LogsParse(str, username, timeStart, timeEnd)
+		parsedStr, err := logsParse(str, username, timeStart, timeEnd)
 		if err != nil {
 			continue
 		}
@@ -285,7 +285,7 @@ func (bot *Bot) VoteOptionsCommand(params []string) error {
 
 // check if there is an emote in the database
 func FfzBttv(emote string) (string, error) {
-	db := ConnectDb()
+	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -302,8 +302,8 @@ func FfzBttv(emote string) (string, error) {
 	return str, nil
 }
 
-func EmoteCache(reverse bool, url string, width int, rewrite bool, thMult float32, emote string) (string, error) {
-	db := ConnectDb()
+func emoteCache(reverse bool, url string, width int, rewrite bool, thMult float32, emote string) (string, error) {
+	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -320,7 +320,7 @@ func EmoteCache(reverse bool, url string, width int, rewrite bool, thMult float3
 		column = "reversedImage"
 	}
 	if err := tx.QueryRow("SELECT "+column+" FROM emoteCache WHERE emote=$l;", emote).Scan(&str); err == sql.ErrNoRows || rewrite || str == "" {
-		str, err = AsciifyRequest(url, width, reverse, thMult)
+		str, err = asciifyRequest(url, width, reverse, thMult)
 		if err != nil {
 			return "", err
 		}
@@ -334,7 +334,7 @@ func EmoteCache(reverse bool, url string, width int, rewrite bool, thMult float3
 }
 
 func addEmote(url, code string) error {
-	db := ConnectDb()
+	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -394,7 +394,7 @@ func (bot *Bot) Asciify(params []string) error {
 		thMult = float32(thMultTemp)
 		rewrite = true
 	}
-	asciifiedImage, err := EmoteCache(reverse, url, width, rewrite, thMult, emote)
+	asciifiedImage, err := emoteCache(reverse, url, width, rewrite, thMult, emote)
 	if err != nil {
 		return err
 	}

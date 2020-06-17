@@ -19,7 +19,7 @@ const (
 	ARROW_RIGHT = 'C'
 )
 
-func Abs(x int) int {
+func abs(x int) int {
 	if x < 0 {
 		return -x
 	}
@@ -34,7 +34,7 @@ func getChar(f *os.File) byte {
 	return bs[0]
 }
 
-func SetTerm() {
+func setTerm() {
 	raw, err := unix.IoctlGetTermios(int(os.Stdin.Fd()), unix.TIOCGETA)
 	if err != nil {
 		//panic(err)
@@ -63,7 +63,7 @@ func processTab(state string, buffer *Buffer) string {
 	switch command {
 	case "find":
 		if buffer.Empty() {
-			buffer.Append(PersonsList(prefix))
+			buffer.Append(personsList(prefix))
 			if buffer.Empty() {
 				buffer.Add(args[0])
 			}
@@ -90,7 +90,7 @@ func createPrefixBuffer(state string, commandsBuffer *Buffer) Buffer {
 	return prefixBuffer
 }
 
-func IsLetter(char byte) bool {
+func isLetter(char byte) bool {
 	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z'
 }
 
@@ -133,7 +133,7 @@ func (console *Console) processConsole() (string, int) {
 			for left = n - 1; left > 0; left-- {
 				if state[left] == '|' {
 					// Trim any non letters
-					for left < len(state) && !IsLetter(state[left]) {
+					for left < len(state) && !isLetter(state[left]) {
 						left++
 					}
 					break
@@ -146,7 +146,7 @@ func (console *Console) processConsole() (string, int) {
 			for right = n; right < len(state); right++ {
 				if state[right] == '|' {
 					// Trim any non letters
-					for !IsLetter(state[right]) {
+					for !isLetter(state[right]) {
 						right--
 					}
 					// for convenience to use in the slice ranges

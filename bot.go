@@ -194,7 +194,7 @@ func (bot *Bot) processCommands(message, username, emotes string) {
 	var cmd *Command
 	var err error
 	level := bot.Authority[username]
-	cmd, err = bot.ParseCommand(message, emotes, username, level)
+	cmd, err = bot.parseCommand(message, emotes, username, level)
 	if err != nil {
 		bot.Status = "Running"
 		log.Println(err)
@@ -231,7 +231,7 @@ func authorityInit() map[string]int {
 	return mp
 }
 
-func (bot *Bot) ChangeAuthority(username, level string) {
+func (bot *Bot) changeAuthority(username, level string) {
 	file, err := ioutil.ReadFile("authority.txt")
 	if err != nil {
 		log.Println(err)
@@ -255,7 +255,7 @@ func (bot *Bot) ChangeAuthority(username, level string) {
 }
 
 func (bot *Bot) updateEmotes() {
-	db := ConnectDb()
+	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -270,7 +270,7 @@ func (bot *Bot) updateEmotes() {
 	ffzUrl := "https://api.frankerfacez.com/v1/room/" + bot.Channel[1:]
 	var ffz map[string]interface{}
 	req, _ := http.NewRequest("GET", ffzUrl, nil)
-	err = RequestJSON(req, 10, &ffz)
+	err = requestJSON(req, 10, &ffz)
 	if err != nil {
 		log.Println(err)
 		return
@@ -300,7 +300,7 @@ func (bot *Bot) updateEmotes() {
 	bttvUrl := "https://api.betterttv.net/3/cached/users/twitch/" + strconv.FormatInt(twitchID, 10)
 	var bttv Bttv
 	req, _ = http.NewRequest("GET", bttvUrl, nil)
-	err = RequestJSON(req, 10, &bttv)
+	err = requestJSON(req, 10, &bttv)
 	if err != nil {
 		log.Println(err)
 	}
@@ -322,7 +322,7 @@ func (bot *Bot) updateEmotes() {
 	req, _ = http.NewRequest("GET", twitchUrl, nil)
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID_"))
 	var tempTwitch map[string]json.RawMessage
-	err = RequestJSON(req, 10, &tempTwitch)
+	err = requestJSON(req, 10, &tempTwitch)
 	if err != nil {
 		log.Println(err)
 		return
@@ -344,7 +344,7 @@ func (bot *Bot) updateEmotes() {
 	tx.Commit()
 }
 
-func StartBot(channel string, botInstances map[string]*Bot) {
+func startBot(channel string, botInstances map[string]*Bot) {
 	logfile, err := os.OpenFile(channel+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Fatal(err)
