@@ -353,6 +353,7 @@ func getChatFromVods(videoId string) ([]string, error) {
 		return nil, err
 	}
 	messages := vodsChat.parse()
+	fmt.Println(messages)
 	for vodsChat.Next != "" {
 		req, _ := http.NewRequest("GET", url+vodsChat.Next, nil)
 		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))

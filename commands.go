@@ -15,11 +15,11 @@ import (
 
 type Command struct {
 	Name      string
-	Params    []string
+	Params    *Message
 	LastUsage time.Time
 	Cd        int
 	Level     int
-	Handler   func([]string) error
+	Handler   func(*Message) error
 }
 
 func checkForUrl(url string) string {
@@ -30,51 +30,10 @@ func checkForUrl(url string) string {
 	return ""
 }
 
-func (bot *Bot) parseCommand(message, emotes, username string, level int) (*Command, error) {
-	args := strings.Split(message, " ")
-	if cmd, ok := bot.Commands[args[0][1:]]; ok {
-		if len(args) > 1 {
-			if cmd.Name == "logs" {
-				cmd.Params = []string{message[strings.Index(message, " ")+1:]}
-			} else {
-				cmd.Params = args[1:]
-			}
-		}
-		if cmd.Name == "asciify" || cmd.Name == "asciify~" {
-			width := ""
-			thMult := ""
-			if len(cmd.Params) > 1 {
-				if level < TOP {
-					return nil, errors.New("!asciify: Not enough rights to change settings")
-				}
-				width = cmd.Params[1]
-				if len(cmd.Params) == 3 {
-					thMult = cmd.Params[2]
-				}
-			}
-
-			if cmd.Params == nil {
-				err := errors.New("!asciify: need emote")
-				return nil, err
-			}
-			url := checkForUrl(cmd.Params[0])
-			// cmd.Params = {bool: reverse image, string: "id of an emote:code of an emote", string: "from twitch or ffzbttv", int: width, float: threshold multiplier"
-			if len(emotes) > 0 {
-				cmd.Params = []string{"false", strings.Split(emotes, ":")[0] + ";" + cmd.Params[0], "twitch", width, thMult}
-			} else {
-				cmd.Params = []string{"false", url + ";" + cmd.Params[0], "ffzbttv", width, thMult}
-			}
-			if cmd.Name == "asciify~" {
-				cmd.Params[0] = "true"
-			}
-		}
-
-		cmd.Params = append(cmd.Params, username)
-
-		err := bot.Cooldown(cmd.Name, level)
-		if err != nil {
-			return nil, err
-		}
+func (bot *Bot) parseCommand(message *Message) (*Command, error) {
+	splitIndex := strings.Index(message.Text, " ")
+	if cmd, ok := bot.Commands[message.Text[1:splitIndex]]; ok {
+		cmd.Params = message
 		return cmd, nil
 	}
 	return nil, errors.New("could not parse command")
@@ -158,7 +117,7 @@ func (bot *Bot) Cooldown(command string, level int) error {
 	}
 }
 
-func (bot *Bot) StopVoteCommand(params []string) error {
+func (bot *Bot) StopVoteCommand(msg *Message) error {
 	bot.Status = "Running"
 	return nil
 }
@@ -196,12 +155,13 @@ func logsParse(str, username string, timeStart, timeEnd time.Time) (string, erro
 	return "", errors.New("Nothing was found")
 }
 
-func (bot *Bot) LogsCommand(params []string) error {
-	if params == nil {
+func (bot *Bot) LogsCommand(msg *Message) error {
+	if msg == nil {
 		return errors.New("!logs: not enough params")
 	}
+	_, params := msg.extractCommand()
 	// username, timeStart, timeEnd (utt)
-	utt := strings.Split(params[0], ",")
+	utt := strings.Split(params, ",")
 	if len(utt) < 3 {
 		return errors.New("!logs: wrong amount of params")
 	}
@@ -229,14 +189,15 @@ func (bot *Bot) LogsCommand(params []string) error {
 	return nil
 }
 
-func (bot *Bot) SmartVoteCommand(params []string) error {
-	if params == nil {
+func (bot *Bot) SmartVoteCommand(msg *Message) error {
+	if msg == nil {
 		return errors.New("!smartvote: not enough params")
 	}
+	_, params := msg.extractCommand()
 	bot.Utils.SmartVote.Options = make(map[string]int)
 	bot.Utils.SmartVote.Votes = make(map[string]string)
 	bot.Status = "smartvote"
-	split := strings.Split(params[0], "-")
+	split := strings.Split(params, "-")
 	if len(split) < 2 {
 		return errors.New("!smartvote: not enough args")
 	}
@@ -257,7 +218,7 @@ func (bot *Bot) SmartVoteCommand(params []string) error {
 	return nil
 }
 
-func (bot *Bot) VoteOptionsCommand(params []string) error {
+func (bot *Bot) VoteOptionsCommand(msg *Message) error {
 	if bot.Status != "smartvote" {
 		return errors.New("There is not any vote")
 	}
@@ -349,50 +310,55 @@ func addEmote(url, code string) error {
 	return nil
 }
 
-func (bot *Bot) Asciify(params []string) error {
-	var url string
-	var emote string
-	var err error
-	split := strings.Split(params[1], ";")
-	emote = split[1]
-	if split[0] == "" {
-		url, err = FfzBttv(emote)
-	} else {
-		url = split[0]
+func (bot *Bot) Asciify(msg *Message) error {
+	if msg == nil {
+		return errors.New("!asciify: not enough params")
 	}
-	switch params[2] {
-	case "twitch":
-		url = "https://static-cdn.jtvnw.net/emoticons/v1/" + split[0] + "/3.0"
-		addEmote(url, emote)
-	case "ffzbttv":
+	cmd, body := msg.extractCommand()
+	params := strings.Split(body, " ")
+	level := bot.Authority[msg.Username]
+	width := 30
+	rewrite := false
+	var thMult float32 = 1.0
+	var err error
+	if len(params) > 1 {
+		if level < TOP {
+			return errors.New("!asciify: Not enough rights to change settings")
+		}
+		width, err = strconv.Atoi(params[1])
 		if err != nil {
 			return err
 		}
+		if len(params) == 3 {
+			thMultTemp, err := strconv.ParseFloat(params[2], 32)
+			if err != nil {
+				return err
+			}
+			thMult = float32(thMultTemp)
+		}
+		rewrite = true
 	}
-	width := 30
-	var thMult float32
-	thMult = 1.0
-	rewrite := false
-	reverse, err := strconv.ParseBool(params[0])
-	if err != nil {
+
+	if len(params) == 0 {
+		err := errors.New("!asciify: need emote")
 		return err
 	}
-	// width of an image parameter
-	if params[3] != "" {
-		width, err = strconv.Atoi(params[3])
-		if err != nil {
-			return err
+	emote := params[0] //msg.Emotes[:strigns.Index(msg.Emotes, ":")]
+	url, err := FfzBttv(emote)
+	if err != nil {
+		if len(msg.Emotes) > 0 {
+			url = "https://static-cdn.jtvnw.net/emoticons/v1/" + msg.Emotes[:strings.Index(msg.Emotes, ":")] + "/3.0"
+			addEmote(url, emote)
+		} else {
+			url = checkForUrl(params[0])
+			if url == "" {
+				return err
+			}
 		}
-		rewrite = true
 	}
-	// threshold multiplier parameter
-	if params[4] != "" {
-		thMultTemp, err := strconv.ParseFloat(params[4], 32)
-		if err != nil {
-			return err
-		}
-		thMult = float32(thMultTemp)
-		rewrite = true
+	reverse := false
+	if cmd == "~asciify" {
+		reverse = true
 	}
 	asciifiedImage, err := emoteCache(reverse, url, width, rewrite, thMult, emote)
 	if err != nil {
@@ -402,11 +368,11 @@ func (bot *Bot) Asciify(params []string) error {
 	return nil
 }
 
-func (bot *Bot) Markov(params []string) error {
-	msg, err := Markov(bot.Channel)
+func (bot *Bot) Markov(msg *Message) error {
+	markovMsg, err := Markov(bot.Channel)
 	if err != nil {
 		return err
 	}
-	bot.SendMessage("@" + params[0] + " " + msg)
+	bot.SendMessage("@" + msg.Username + " " + markovMsg)
 	return nil
 }

@@ -137,6 +137,12 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 type Message struct {
 	Username string
 	Text     string
+	Emotes   string
+}
+
+func (msg *Message) extractCommand() (string, string) {
+	index := strings.Index(msg.Text, " ")
+	return msg.Text[1:index], msg.Text[index+1:]
 }
 
 func (bot *Bot) logsWriter(logChan <-chan Message) {
@@ -159,7 +165,8 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 		username := match[1][2]
 		emotes := match[0][1]
 		usermessage := match[2][3]
-		logChan <- Message{username, usermessage}
+		message := Message{username, usermessage, emotes}
+		logChan <- message
 		messageLength := len(usermessage)
 		if bot.Status == "smartvote" && messageLength == 1 {
 			// check if there is that vote option
@@ -182,7 +189,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 		}
 
 		if usermessage[0] == '!' {
-			bot.processCommands(usermessage, username, emotes)
+			bot.processCommands(message)
 		}
 	} else if strings.HasPrefix(line, "PING") { // response to keep connection alive
 		bot.Pong(line)
@@ -190,11 +197,11 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 }
 
 // chat commands
-func (bot *Bot) processCommands(message, username, emotes string) {
+func (bot *Bot) processCommands(message Message) {
 	var cmd *Command
 	var err error
-	level := bot.Authority[username]
-	cmd, err = bot.parseCommand(message, emotes, username, level)
+	level := bot.Authority[message.Username]
+	cmd, err = bot.parseCommand(&message)
 	if err != nil {
 		bot.Status = "Running"
 		log.Println(err)
