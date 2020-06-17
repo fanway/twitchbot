@@ -162,19 +162,20 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 	if strings.Contains(line, "PRIVMSG") {
 		re := regexp.MustCompile(`emotes=(.*?);|@(.*?)\.tmi\.twitch\.tv|PRIVMSG.*?:(.*)`)
 		match := re.FindAllStringSubmatch(line[1:], -1)
-		username := match[1][2]
-		emotes := match[0][1]
-		usermessage := match[2][3]
-		message := Message{username, usermessage, emotes}
+		message := Message{
+			Username: match[1][2],
+			Emotes:   match[0][1],
+			Text:     match[2][3],
+		}
 		logChan <- message
-		messageLength := len(usermessage)
+		messageLength := len(message.Text)
 		if bot.Status == "smartvote" && messageLength == 1 {
 			// check if there is that vote option
-			if _, ok := bot.Utils.SmartVote.Options[usermessage]; ok {
+			if _, ok := bot.Utils.SmartVote.Options[message.Text]; ok {
 				// consider only the first vote
-				if _, ok := bot.Utils.SmartVote.Votes[username]; !ok {
-					bot.Utils.SmartVote.Options[usermessage]++
-					bot.Utils.SmartVote.Votes[username] = usermessage
+				if _, ok := bot.Utils.SmartVote.Votes[message.Username]; !ok {
+					bot.Utils.SmartVote.Options[message.Text]++
+					bot.Utils.SmartVote.Votes[message.Username] = message.Text
 				}
 			}
 		}
@@ -185,11 +186,11 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			}
 			defer pasteFile.Close()
 			pasteWriter := bufio.NewWriter(pasteFile)
-			fmt.Fprintf(pasteWriter, "%s\n\n", usermessage)
+			fmt.Fprintf(pasteWriter, "%s\n\n", message.Text)
 		}
 
-		if usermessage[0] == '!' {
-			bot.processCommands(message)
+		if message.Text[0] == '!' {
+			bot.processCommands(&message)
 		}
 	} else if strings.HasPrefix(line, "PING") { // response to keep connection alive
 		bot.Pong(line)
@@ -197,11 +198,11 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 }
 
 // chat commands
-func (bot *Bot) processCommands(message Message) {
+func (bot *Bot) processCommands(message *Message) {
 	var cmd *Command
 	var err error
 	level := bot.Authority[message.Username]
-	cmd, err = bot.parseCommand(&message)
+	cmd, err = bot.parseCommand(message)
 	if err != nil {
 		bot.Status = "Running"
 		log.Println(err)
