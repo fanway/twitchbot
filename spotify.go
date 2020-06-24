@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -193,13 +194,15 @@ func checkAuth() string {
 
 func searchTrack(name string) (*Search, error) {
 	auth := checkAuth()
-	name = strings.Replace(name, " ", "%20", -1)
+	name = url.QueryEscape(name)
 	url := "https://api.spotify.com/v1/search?query=" + name + "&offset=0&limit=1&type=track"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+auth)
+	req.Header.Set("Content-Type", "application/json")
 	var search Search
 	err := requestJSON(req, 10, &search)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return &search, nil

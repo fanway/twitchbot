@@ -397,6 +397,7 @@ func (bot *Bot) RequestTrack(msg *Message) error {
 	_, params := msg.extractCommand()
 	track, err := searchTrack(params)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	if len(track.Tracks.Items) == 0 {
@@ -406,6 +407,7 @@ func (bot *Bot) RequestTrack(msg *Message) error {
 
 	err = addToPlaylist(track.Tracks.Items[0].URI)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
@@ -416,6 +418,7 @@ func (bot *Bot) RequestTrack(msg *Message) error {
 func (bot *Bot) CurrentTrack(msg *Message) error {
 	track, err := getCurrentTrack()
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	if track != "" {
