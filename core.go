@@ -67,7 +67,7 @@ func requestJSON(req *http.Request, timeout int, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	if res.StatusCode > 226 && res.StatusCode < 200 {
+	if res.StatusCode < http.StatusOK || res.StatusCode > http.StatusIMUsed {
 		return errors.New("HTTP status:" + strconv.Itoa(res.StatusCode))
 	}
 	defer res.Body.Close()
