@@ -232,7 +232,11 @@ func getCurrentTrack() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return curr.Item.Artists[0].Name + " - " + curr.Item.Name, nil
+	name := curr.Item.Artists[0].Name
+	for i := 1; i < len(curr.Item.Artists); i++ {
+		name += ", " + curr.Item.Artists[i].Name
+	}
+	return name + " - " + curr.Item.Name, nil
 }
 
 func skipToNextTrack() {
