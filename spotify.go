@@ -191,7 +191,7 @@ func checkAuth() string {
 	return data.Auth
 }
 
-func searchTrack(name string) string {
+func searchTrack(name string) (*Search, error) {
 	auth := checkAuth()
 	name = strings.Replace(name, " ", "%20", -1)
 	url := "https://api.spotify.com/v1/search?query=" + name + "&offset=0&limit=1&type=track"
@@ -200,13 +200,12 @@ func searchTrack(name string) string {
 	var search Search
 	err := requestJSON(req, 10, &search)
 	if err != nil {
-		log.Println(err)
-		return ""
+		return nil, err
 	}
-	return search.Tracks.Items[0].URI
+	return &search, nil
 }
 
-func addToPlaylist(uri string) {
+func addToPlaylist(uri string) error {
 	auth := checkAuth()
 	url := "https://api.spotify.com/v1/playlists/6U9yUDYW4uN845DUERRiMH/tracks?uris=" + uri
 	req, _ := http.NewRequest("POST", url, nil)
@@ -215,7 +214,9 @@ func addToPlaylist(uri string) {
 	err := requestJSON(req, 10, nil)
 	if err != nil {
 		fmt.Println(err)
+		return err
 	}
+	return nil
 }
 
 func getCurrentTrack() string {

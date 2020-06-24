@@ -90,6 +90,13 @@ func (bot *Bot) initCommands() {
 			Level:   MIDDLE,
 			Handler: bot.Markov,
 		},
+		// !r <song name>
+		"r": &Command{
+			Name:    "r",
+			Cd:      0,
+			Level:   LOW,
+			Handler: bot.RequestTrack,
+		},
 	}
 }
 
@@ -374,5 +381,25 @@ func (bot *Bot) Markov(msg *Message) error {
 		return err
 	}
 	bot.SendMessage("@" + msg.Username + " " + markovMsg)
+	return nil
+}
+
+func (bot *Bot) RequestTrack(msg *Message) error {
+	_, params := msg.extractCommand()
+	track, err := searchTrack(params)
+	if err != nil {
+		return err
+	}
+	if len(track.Tracks.Items) == 0 {
+		bot.SendMessage("@" + msg.Username + " track wasn't found")
+		return errors.New("Track wasn't found")
+	}
+
+	err = addToPlaylist(track.Tracks.Items[0].URI)
+	if err != nil {
+		return err
+	}
+	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
+	bot.SendMessage("@" + msg.Username + " " + trackName + " was added a playlist")
 	return nil
 }

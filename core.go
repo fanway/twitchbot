@@ -67,7 +67,7 @@ func requestJSON(req *http.Request, timeout int, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode > 226 && res.StatusCode < 200 {
 		return errors.New("HTTP status:" + strconv.Itoa(res.StatusCode))
 	}
 	defer res.Body.Close()
@@ -539,9 +539,12 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 			console.comments = nil
 		case "searchtrack":
-			uri := searchTrack(s[strings.Index(s, " ")+1:])
-			fmt.Println(uri)
-			addToPlaylist(uri)
+			track, err := searchTrack(s[strings.Index(s, " ")+1:])
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+			addToPlaylist(track.Tracks.Items[0].URI)
 		case "currenttrack":
 			fmt.Println(getCurrentTrack())
 		case "nexttrack":
