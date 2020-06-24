@@ -70,6 +70,7 @@ func requestJSON(req *http.Request, timeout int, obj interface{}) error {
 	if res.StatusCode != http.StatusOK {
 		return errors.New("HTTP status:" + strconv.Itoa(res.StatusCode))
 	}
+	defer res.Body.Close()
 	decoder := json.NewDecoder(res.Body)
 	decoder.UseNumber()
 	err = decoder.Decode(&obj)
@@ -537,6 +538,10 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				break
 			}
 			console.comments = nil
+		case "searchtrack":
+			uri := searchTrack(s[strings.Index(s, " ")+1:])
+			fmt.Println(uri)
+			addToPlaylist(uri)
 		}
 	}
 }

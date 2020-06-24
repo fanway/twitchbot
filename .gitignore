@@ -1,5 +1,6 @@
 *.log
 *.txt
 *.db
+*.json
 /logs
 .DS_Store
