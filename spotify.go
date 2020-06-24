@@ -219,7 +219,7 @@ func addToPlaylist(uri string) error {
 	return nil
 }
 
-func getCurrentTrack() string {
+func getCurrentTrack() (string, error) {
 	auth := checkAuth()
 	url := "https://api.spotify.com/v1/me/player/currently-playing"
 	req, _ := http.NewRequest("GET", url, nil)
@@ -227,10 +227,9 @@ func getCurrentTrack() string {
 	var curr Current
 	err := requestJSON(req, 10, &curr)
 	if err != nil {
-		fmt.Println(err)
-		return ""
+		return "", err
 	}
-	return curr.Item.Artists[0].Name + " - " + curr.Item.Name
+	return curr.Item.Artists[0].Name + " - " + curr.Item.Name, nil
 }
 
 func skipToNextTrack() {

@@ -142,6 +142,9 @@ type Message struct {
 
 func (msg *Message) extractCommand() (string, string) {
 	index := strings.Index(msg.Text, " ")
+	if index == -1 {
+		return msg.Text[1:], ""
+	}
 	return msg.Text[1:index], msg.Text[index+1:]
 }
 

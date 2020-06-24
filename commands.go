@@ -32,6 +32,9 @@ func checkForUrl(url string) string {
 
 func (bot *Bot) parseCommand(message *Message) (*Command, error) {
 	splitIndex := strings.Index(message.Text, " ")
+	if splitIndex == -1 {
+		splitIndex = len(message.Text)
+	}
 	if cmd, ok := bot.Commands[message.Text[1:splitIndex]]; ok {
 		cmd.Params = message
 		return cmd, nil
@@ -96,6 +99,12 @@ func (bot *Bot) initCommands() {
 			Cd:      0,
 			Level:   LOW,
 			Handler: bot.RequestTrack,
+		},
+		"song": &Command{
+			Name:    "song",
+			Cd:      10,
+			Level:   LOW,
+			Handler: bot.CurrentTrack,
 		},
 	}
 }
@@ -401,5 +410,16 @@ func (bot *Bot) RequestTrack(msg *Message) error {
 	}
 	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
 	bot.SendMessage("@" + msg.Username + " " + trackName + " was added a playlist")
+	return nil
+}
+
+func (bot *Bot) CurrentTrack(msg *Message) error {
+	track, err := getCurrentTrack()
+	if err != nil {
+		return err
+	}
+	if track != "" {
+		bot.SendMessage("@" + msg.Username + " " + track)
+	}
 	return nil
 }
