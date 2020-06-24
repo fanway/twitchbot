@@ -542,6 +542,10 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			uri := searchTrack(s[strings.Index(s, " ")+1:])
 			fmt.Println(uri)
 			addToPlaylist(uri)
+		case "currenttrack":
+			fmt.Println(getCurrentTrack())
+		case "nexttrack":
+			skipToNextTrack()
 		}
 	}
 }

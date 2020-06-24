@@ -83,6 +83,67 @@ type Search struct {
 	} `json:"tracks"`
 }
 
+type Current struct {
+	Context struct {
+		ExternalUrls struct {
+			Spotify string `json:"spotify"`
+		} `json:"external_urls"`
+		Href string `json:"href"`
+		Type string `json:"type"`
+		URI  string `json:"uri"`
+	} `json:"context"`
+	Timestamp            int64  `json:"timestamp"`
+	ProgressMs           int    `json:"progress_ms"`
+	IsPlaying            bool   `json:"is_playing"`
+	CurrentlyPlayingType string `json:"currently_playing_type"`
+	Item                 struct {
+		Album struct {
+			AlbumType    string `json:"album_type"`
+			ExternalUrls struct {
+				Spotify string `json:"spotify"`
+			} `json:"external_urls"`
+			Href   string `json:"href"`
+			ID     string `json:"id"`
+			Images []struct {
+				Height int    `json:"height"`
+				URL    string `json:"url"`
+				Width  int    `json:"width"`
+			} `json:"images"`
+			Name string `json:"name"`
+			Type string `json:"type"`
+			URI  string `json:"uri"`
+		} `json:"album"`
+		Artists []struct {
+			ExternalUrls struct {
+				Spotify string `json:"spotify"`
+			} `json:"external_urls"`
+			Href string `json:"href"`
+			ID   string `json:"id"`
+			Name string `json:"name"`
+			Type string `json:"type"`
+			URI  string `json:"uri"`
+		} `json:"artists"`
+		AvailableMarkets []string `json:"available_markets"`
+		DiscNumber       int      `json:"disc_number"`
+		DurationMs       int      `json:"duration_ms"`
+		Explicit         bool     `json:"explicit"`
+		ExternalIds      struct {
+			Isrc string `json:"isrc"`
+		} `json:"external_ids"`
+		ExternalUrls struct {
+			Spotify string `json:"spotify"`
+		} `json:"external_urls"`
+		Href        string `json:"href"`
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Popularity  int    `json:"popularity"`
+		PreviewURL  string `json:"preview_url"`
+		TrackNumber int    `json:"track_number"`
+		Type        string `json:"type"`
+		URI         string `json:"uri"`
+	} `json:"item"`
+}
+
 type Auth struct {
 	Auth         string    `json:"auth"`
 	Refresh      string    `json:"refresh"`
@@ -107,7 +168,6 @@ func checkAuth() string {
 		log.Println(err)
 		return ""
 	}
-	fmt.Println(data)
 	client := base64.StdEncoding.EncodeToString([]byte(data.ClientId + ":" + data.ClientSecret))
 	t := time.Since(data.Time)
 	if t >= time.Duration(data.Expired)*time.Second {
@@ -134,7 +194,6 @@ func checkAuth() string {
 func searchTrack(name string) string {
 	auth := checkAuth()
 	name = strings.Replace(name, " ", "%20", -1)
-	fmt.Println(name)
 	url := "https://api.spotify.com/v1/search?query=" + name + "&offset=0&limit=1&type=track"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+auth)
@@ -156,5 +215,31 @@ func addToPlaylist(uri string) {
 	err := requestJSON(req, 10, nil)
 	if err != nil {
 		fmt.Println(err)
+	}
+}
+
+func getCurrentTrack() string {
+	auth := checkAuth()
+	url := "https://api.spotify.com/v1/me/player/currently-playing"
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+auth)
+	var curr Current
+	err := requestJSON(req, 10, &curr)
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	return curr.Item.Artists[0].Name + " - " + curr.Item.Name
+}
+
+func skipToNextTrack() {
+	auth := checkAuth()
+	url := "https://api.spotify.com/v1/me/player/next"
+	req, _ := http.NewRequest("POST", url, nil)
+	req.Header.Set("Authorization", "Bearer "+auth)
+	err := requestJSON(req, 10, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 }
