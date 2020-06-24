@@ -189,7 +189,11 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			}
 			defer pasteFile.Close()
 			pasteWriter := bufio.NewWriter(pasteFile)
-			fmt.Fprintf(pasteWriter, "%s\n\n", message.Text)
+			_, err = fmt.Fprintf(pasteWriter, "%s\n\n", message.Text)
+			if err != nil {
+				log.Println(err)
+			}
+			pasteWriter.Flush()
 		}
 
 		if message.Text[0] == '!' {
