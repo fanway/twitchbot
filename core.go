@@ -498,11 +498,13 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				fmt.Println("load some comments")
 				break
 			}
-			if len(args) == 1 {
+			commentsArgs := strings.Split(s[strings.Index(s, " ")+1:], ",")
+			length := len(commentsArgs)
+			if length == 1 {
 				timeEnd = time.Now()
-			} else if len(args) == 3 {
+			} else if length == 3 {
 				var err error
-				timeStart, timeEnd, err = parseLogTime(args[1], args[2])
+				timeStart, timeEnd, err = parseLogTime(commentsArgs[1], commentsArgs[2])
 				if err != nil {
 					log.Println(err)
 					break
@@ -510,7 +512,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			} else {
 				break
 			}
-			username := args[0]
+			username := commentsArgs[0]
 			for _, comment := range console.comments {
 				str, err := logsParse(comment, username, timeStart, timeEnd)
 				if err != nil {
