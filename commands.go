@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -153,19 +154,15 @@ func parseLogTime(start, end string) (time.Time, time.Time, error) {
 
 func logsParse(str, username string, timeStart, timeEnd time.Time) (string, error) {
 	layout := "2006-01-02 15:04:05 -0700 MST"
-	var tt string
-	if strings.Contains(str, "[") {
-		tt = strings.Split(strings.Split(str, "[")[1], "]")[0]
-		timeq, err := time.Parse(layout, tt)
-		if err != nil {
-			return "", err
-		}
-		if timeq.Before(timeEnd) && timeq.After(timeStart) {
-			if strings.Count(str, ":") > 2 {
-				if strings.Contains(strings.Split(str, ":")[2], username) || username == "all" {
-					return str, nil
-				}
-			}
+	re := regexp.MustCompile(`\[(.*?)]| (.*?):`)
+	match := re.FindAllStringSubmatch(str, -1)
+	timeq, err := time.Parse(layout, match[0][1])
+	if err != nil {
+		return "", err
+	}
+	if timeq.Before(timeEnd) && timeq.After(timeStart) {
+		if username == match[1][2] || username == "all" {
+			return str, nil
 		}
 	}
 	return "", errors.New("Nothing was found")
