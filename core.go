@@ -281,9 +281,10 @@ func (chat *VodsChat) parse() []string {
 	for _, comment := range chat.Comments {
 		username := comment.Commenter.DisplayName
 		currentTime := time.Now()
-		time := comment.CreatedAt.In(currentTime.Location()).Format("2006-01-02 15:04:05 -0700 MST")
+		timeCreated := comment.CreatedAt.In(currentTime.Location()).Format("2006-01-02 15:04:05 -0700 MST")
+		timeOffset := time.Date(0, 0, 0, 0, 0, int(comment.ContentOffsetSeconds), 0, time.UTC).Format("15:04:05")
 		msg := comment.Message.Body
-		messages = append(messages, fmt.Sprintf("[%s] %s: %s\n", time, username, msg))
+		messages = append(messages, fmt.Sprintf("[%s] %s: %s [%s]\n", timeCreated, username, msg, timeOffset))
 	}
 	return messages
 }
