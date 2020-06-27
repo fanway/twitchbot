@@ -105,6 +105,7 @@ func findPerson(name string) {
 		url := "https://api.twitch.tv/helix/users?login=" + name
 		req, _ := http.NewRequest("GET", url, nil)
 		req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
+		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 		var iddata IdData
 		err := requestJSON(req, 10, &iddata)
 		if err != nil {
