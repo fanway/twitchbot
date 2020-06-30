@@ -141,6 +141,7 @@ func findPerson(name string) {
 		log.Println(err)
 	}
 
+	tx.Exec("UPDATE Followers SET FromName=$1 WHERE FromId=$2", followers.Data[0].FromName, id)
 	for _, d := range followers.Data {
 		_, err := tx.Exec("INSERT INTO temp.Follow(FromId, FromName, ToId, ToName, FollowedAt) values($1, $2, $3, $4, $5);", d.FromID, d.FromName, d.ToID, d.ToName, d.FollowedAt)
 		if err != nil {
