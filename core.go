@@ -9,6 +9,7 @@ import (
 	"image"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -101,11 +102,11 @@ func findPerson(name string) {
 	var id string
 	row := tx.QueryRow("SELECT FromId FROM Followers WHERE FromName=$1;", name)
 	err = row.Scan(&id)
+	u := "https://api.twitch.tv/helix/users?login=" + name
+	req, _ := http.NewRequest("GET", u, nil)
+	req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
+	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 	if err != nil {
-		url := "https://api.twitch.tv/helix/users?login=" + name
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
-		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 		var iddata IdData
 		err := requestJSON(req, 10, &iddata)
 		if err != nil {
@@ -114,10 +115,7 @@ func findPerson(name string) {
 		}
 		id = iddata.Data[0].ID
 	}
-	url := "https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
-	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+	req.URL, _ = url.Parse("https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id)
 	var followers Followers
 	err = requestJSON(req, 10, &followers)
 	if err != nil {
@@ -126,10 +124,7 @@ func findPerson(name string) {
 	}
 	cursor := followers.Pagination.Cursor
 	for i := 0; i < followers.Total/100; i++ {
-		url = "https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id + "&after=" + cursor
-		req, _ = http.NewRequest("GET", url, nil)
-		req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
-		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+		req.URL, _ = url.Parse("https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id + "&after=" + cursor)
 		var temp Followers
 		err = requestJSON(req, 10, &temp)
 		if err != nil {
@@ -156,7 +151,23 @@ func findPerson(name string) {
 	rows, err := tx.Query("SELECT * FROM temp.Follow tm WHERE NOT EXISTS (SELECT * FROM Followers t WHERE tm.FromId = t.FromId AND tm.ToId = t.Toid);")
 
 	defer rows.Close()
-	fmt.Println(name)
+	u = "https://tmi.twitch.tv/group/user/" + strings.ToLower(name) + "/chatters"
+	req, _ = http.NewRequest("GET", u, nil)
+	var chatData ChatData
+	err = requestJSON(req, 10, &chatData)
+	if err != nil {
+		log.Println(err)
+	}
+	online := false
+
+	if len(chatData.Chatters.Broadcaster) > 0 {
+		online = true
+	}
+	if online {
+		fmt.Println(name + " [ONLINE]")
+	} else {
+		fmt.Println(name + " [OFFLINE]")
+	}
 	fmt.Println("-----------------------")
 
 	if err != nil {
@@ -211,17 +222,19 @@ func findPerson(name string) {
 	if err != nil {
 		log.Println(err)
 	}
+	if !online {
+		return
+	}
 	name = strings.ToLower(name)
 	fmt.Println("Currently watching: ")
 	for rows.Next() {
 		var toName string
 		rows.Scan(&toName)
-		url = "https://tmi.twitch.tv/group/user/" + strings.ToLower(toName) + "/chatters"
-		req, _ := http.NewRequest("GET", url, nil)
+		u = "https://tmi.twitch.tv/group/user/" + strings.ToLower(toName) + "/chatters"
+		req, _ := http.NewRequest("GET", u, nil)
 		var chatData ChatData
 		err = requestJSON(req, 10, &chatData)
 		if err != nil {
-			//log.Println(err)
 			continue
 		}
 
@@ -243,10 +256,8 @@ func findPerson(name string) {
 			}
 		}
 	}
-	fmt.Println("")
-
 	tx.Commit()
-	fmt.Println("-----------------------")
+	fmt.Println("\n-----------------------")
 }
 
 func personsList(prefix string) []string {
@@ -347,8 +358,8 @@ type Comments struct {
 }
 
 func getChatFromVods(videoId string) ([]string, error) {
-	url := "https://api.twitch.tv/v5/videos/" + videoId + "/comments?cursor="
-	req, _ := http.NewRequest("GET", url, nil)
+	u := "https://api.twitch.tv/v5/videos/" + videoId + "/comments?cursor="
+	req, _ := http.NewRequest("GET", u, nil)
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 	var vodsChat VodsChat
 	err := requestJSON(req, 10, &vodsChat)
@@ -358,8 +369,7 @@ func getChatFromVods(videoId string) ([]string, error) {
 	messages := vodsChat.parse()
 	fmt.Println(messages)
 	for vodsChat.Next != "" {
-		req, _ := http.NewRequest("GET", url+vodsChat.Next, nil)
-		req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+		req.URL, _ = url.Parse(u + vodsChat.Next)
 		vodsChat = VodsChat{}
 		err := requestJSON(req, 10, &vodsChat)
 		if err != nil {
