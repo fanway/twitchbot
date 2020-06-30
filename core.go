@@ -217,12 +217,13 @@ func findPerson(name string) {
 	fmt.Println("")
 
 	rows, err = tx.Query("SELECT ToName FROM Followers WHERE FromId=$1;", id)
-
 	defer rows.Close()
 	if err != nil {
 		log.Println(err)
 	}
 	if !online {
+		fmt.Println("-----------------------")
+		tx.Commit()
 		return
 	}
 	name = strings.ToLower(name)
