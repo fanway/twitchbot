@@ -43,6 +43,8 @@ type Bot struct {
 	StopChannel chan struct{}
 	Authority   map[string]int
 	Status      string
+	Warn        map[string]*[]Warning
+	BadWords    map[string]struct{}
 	Commands    map[string]*Command
 	Utils       Utils
 }
@@ -138,6 +140,7 @@ type Message struct {
 	Username string
 	Text     string
 	Emotes   string
+	ID       string
 }
 
 func (msg *Message) extractCommand() (string, string) {
@@ -161,16 +164,62 @@ func (bot *Bot) logsWriter(logChan <-chan Message) {
 	}
 }
 
+type Warning struct {
+	Reason      string
+	TimeCreated time.Time
+}
+
+func (bot *Bot) timeout(username, reason string, seconds int) {
+	bot.SendMessage("/timeout " + username + " " + strconv.Itoa(seconds))
+	bot.SendMessage("@" + username + " " + reason)
+}
+
+func (bot *Bot) warning(username, id, reason string, seconds int) {
+	warnings := bot.Warn[username]
+	if warnings == nil {
+		warnings = &[]Warning{}
+	}
+	length := len(*warnings)
+	if length == 2 {
+		bot.timeout(username, "3rd warning", 86400)
+		delete(bot.Warn, username)
+		return
+	}
+	for i, _ := range *warnings {
+		if time.Since((*warnings)[i].TimeCreated)*time.Second > 1800 {
+			(*warnings)[i] = (*warnings)[length]
+			*warnings = (*warnings)[:length-1]
+		}
+	}
+	*warnings = append(*warnings, Warning{Reason: reason, TimeCreated: time.Now()})
+	bot.timeout(username, reason, seconds)
+}
+
+func (bot *Bot) checkMessage(msg *Message) {
+	split := strings.Split(msg.Text, " ")
+	if len(split) > 1 {
+		split = append(split, msg.Text)
+	}
+	fmt.Println(bot.BadWords)
+	for i, _ := range split {
+		if _, ok := bot.BadWords[split[i]]; ok {
+			bot.warning(msg.Username, msg.ID, "Warning: Usage of explicit language", 300)
+		}
+	}
+}
+
 func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 	if strings.Contains(line, "PRIVMSG") {
-		re := regexp.MustCompile(`emotes=(.*?);|@(.*?)\.tmi\.twitch\.tv|PRIVMSG.*?:(.*)`)
+		re := regexp.MustCompile(`emotes=(.*?);|@(.*?)\.tmi\.twitch\.tv|PRIVMSG.*?:(.*)|id=(.*?);`)
 		match := re.FindAllStringSubmatch(line[1:], -1)
 		message := Message{
-			Username: match[1][2],
 			Emotes:   match[0][1],
-			Text:     match[2][3],
+			ID:       match[1][4],
+			Username: match[4][2],
+			Text:     match[5][3],
 		}
 		logChan <- message
+		go bot.checkMessage(&message)
 		messageLength := len(message.Text)
 		if bot.Status == "smartvote" && messageLength == 1 {
 			// check if there is that vote option
@@ -223,7 +272,19 @@ func (bot *Bot) processCommands(message *Message) {
 	}
 }
 
-func authorityInit() map[string]int {
+func initBadWords() map[string]struct{} {
+	file, err := ioutil.ReadFile("badwords.txt")
+	if err != nil {
+		log.Println(err)
+	}
+	var m map[string]struct{}
+	if err = json.Unmarshal(file, &m); err != nil {
+		log.Println(err)
+	}
+	return m
+}
+
+func initAuthority() map[string]int {
 	file, err := ioutil.ReadFile("authority.txt")
 	if err != nil {
 		log.Println(err)
@@ -266,7 +327,7 @@ func (bot *Bot) changeAuthority(username, level string) {
 		log.Println(err)
 		return
 	}
-	bot.Authority = authorityInit()
+	bot.Authority = initAuthority()
 }
 
 func (bot *Bot) updateEmotes() {
@@ -365,7 +426,6 @@ func startBot(channel string, botInstances map[string]*Bot) {
 		log.Fatal(err)
 	}
 	defer logfile.Close()
-	m := authorityInit()
 	bot := Bot{
 		Channel:     channel,
 		Name:        "funwayz",
@@ -375,7 +435,8 @@ func startBot(channel string, botInstances map[string]*Bot) {
 		File:        logfile,
 		Conn:        nil,
 		StopChannel: make(chan struct{}),
-		Authority:   m,
+		BadWords:    initBadWords(),
+		Authority:   initAuthority(),
 	}
 	botInstances[channel] = &bot
 	bot.Connect()
