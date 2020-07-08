@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/sys/unix"
 )
@@ -26,12 +28,13 @@ func abs(x int) int {
 	return x
 }
 
-func getChar(f *os.File) byte {
-	bs := make([]byte, 1, 1)
-	if _, err := f.Read(bs); err != nil {
-		return 0
+func getChar(f *os.File) ([]byte, int) {
+	bs := make([]byte, 3, 3)
+	n, err := f.Read(bs)
+	if err != nil {
+		return nil, 0
 	}
-	return bs[0]
+	return bs, n
 }
 
 func setTerm() {
@@ -95,21 +98,23 @@ func isLetter(char byte) bool {
 }
 
 func (console *Console) processConsole() (string, int) {
-	var state string
+	var state []rune
 	var tabBuffer Buffer
 	var prefixBuffer Buffer
 	var arrowPointer int
 	var arrowState string
+	var lenState int
 	for {
 		// \033[H
-		fmt.Print("\033[2K\r" + "[" + console.currentChannel + "]> " + state + arrowState)
-		ch := getChar(os.Stdin)
-		switch ch {
+		lenState = len(state)
+		fmt.Print("\033[2K\r" + "[" + console.currentChannel + "]> " + string(state) + arrowState)
+		ch, numOfBytes := getChar(os.Stdin)
+		switch ch[0] {
 		case BACKSPACE:
-			if len(state) > 0 {
-				n := len(state) - arrowPointer - 1
+			if lenState > 0 {
+				n := lenState - arrowPointer - 1
 				if n >= 0 {
-					state = state[:n] + state[n+1:]
+					state = append(state[:n], state[n+1:]...)
 					arrowState = ""
 					// TODO: rethink this part
 					for i := 0; i < arrowPointer; i++ {
@@ -120,20 +125,21 @@ func (console *Console) processConsole() (string, int) {
 			tabBuffer.Clear()
 			prefixBuffer.Clear()
 		case ENTER:
-			if console.commandsBuffer.Empty() || state != console.commandsBuffer.Back() {
-				console.commandsBuffer.Add(state)
+			stringState := string(state)
+			if console.commandsBuffer.Empty() || stringState != console.commandsBuffer.Back() {
+				console.commandsBuffer.Add(stringState)
 			}
 			console.commandsBuffer.index = console.commandsBuffer.Size()
 			fmt.Println("")
-			return state, ENTER
+			return stringState, ENTER
 		case TAB:
-			n := len(state) - arrowPointer
+			n := lenState - arrowPointer
 			left, right := 0, 0
 			// find index of the first occurance of '|' character on the left
 			for left = n - 1; left > 0; left-- {
 				if state[left] == '|' {
 					// Trim any non letters
-					for left < len(state) && !isLetter(state[left]) {
+					for left < lenState && !unicode.IsLetter(state[left]) {
 						left++
 					}
 					break
@@ -143,10 +149,10 @@ func (console *Console) processConsole() (string, int) {
 				left = 0
 			}
 			// find index of the first occurance of '|' character on the right
-			for right = n; right < len(state); right++ {
+			for right = n; right < lenState; right++ {
 				if state[right] == '|' {
 					// Trim any non letters
-					for !isLetter(state[right]) {
+					for !unicode.IsLetter(state[right]) {
 						right--
 					}
 					// for convenience to use in the slice ranges
@@ -154,38 +160,39 @@ func (console *Console) processConsole() (string, int) {
 					break
 				}
 			}
-			state = state[:left] + processTab(state[left:right], &tabBuffer) + state[right:]
+			state = append(state[:left], append([]rune(processTab(string(state[left:right]), &tabBuffer)), state[right:]...)...)
 		case ESC:
-			tempFirst := getChar(os.Stdin)
-			if tempFirst == '[' {
-				tempSecond := getChar(os.Stdin)
-				switch tempSecond {
+			if numOfBytes != 3 {
+				continue
+			}
+			if ch[1] == '[' {
+				switch ch[2] {
 				case ARROW_UP:
 					if !console.commandsBuffer.Empty() {
 						if prefixBuffer.Empty() {
-							prefixBuffer = createPrefixBuffer(state, &console.commandsBuffer)
+							prefixBuffer = createPrefixBuffer(string(state), &console.commandsBuffer)
 						}
 						//up
 						if prefixBuffer.index != 0 {
 							prefixBuffer.index--
-							state = prefixBuffer.Get()
+							state = []rune(prefixBuffer.Get())
 						}
 					}
 				case ARROW_DOWN:
 					if !console.commandsBuffer.Empty() {
 						if prefixBuffer.Empty() {
-							prefixBuffer = createPrefixBuffer(state, &console.commandsBuffer)
+							prefixBuffer = createPrefixBuffer(string(state), &console.commandsBuffer)
 						}
 						//down
 						if prefixBuffer.index >= prefixBuffer.Size()-1 {
-							state = prefixBuffer.Back()
+							state = []rune(prefixBuffer.Back())
 						} else {
 							prefixBuffer.index++
-							state = prefixBuffer.Get()
+							state = []rune(prefixBuffer.Get())
 						}
 					}
 				case ARROW_LEFT:
-					if arrowPointer < len(state) {
+					if arrowPointer < lenState {
 						//left
 						arrowPointer++
 						arrowState += "\033[D"
@@ -198,11 +205,13 @@ func (console *Console) processConsole() (string, int) {
 					}
 				}
 			} else {
-				state += string(tempFirst)
+				r, _ := utf8.DecodeRune([]byte{ch[1]})
+				state = append(state, r)
 			}
 		default:
-			n := len(state) - arrowPointer - 1
-			state = state[:n+1] + string(ch) + state[n+1:]
+			n := lenState - arrowPointer - 1
+			r, _ := utf8.DecodeRune(ch[:numOfBytes])
+			state = append(state[:n+1], append([]rune{r}, state[n+1:]...)...)
 			prefixBuffer.Clear()
 			tabBuffer.Clear()
 		}

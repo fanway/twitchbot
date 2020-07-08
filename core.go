@@ -505,12 +505,12 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				log.Println(err)
 			}
 		case "sortcomments":
-			var timeStart time.Time
-			var timeEnd time.Time
 			if console.comments == nil {
 				fmt.Println("load some comments")
 				break
 			}
+			var timeStart time.Time
+			var timeEnd time.Time
 			commentsArgs := strings.Split(s[strings.Index(s, " ")+1:], ",")
 			length := len(commentsArgs)
 			if length == 1 {
