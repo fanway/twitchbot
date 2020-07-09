@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"golang.org/x/sys/unix"
 )
@@ -29,7 +28,7 @@ func abs(x int) int {
 }
 
 func getChar(f *os.File) ([]byte, int) {
-	bs := make([]byte, 3, 3)
+	bs := make([]byte, 16, 16)
 	n, err := f.Read(bs)
 	if err != nil {
 		return nil, 0
@@ -108,7 +107,8 @@ func (console *Console) processConsole() (string, int) {
 		// \033[H
 		lenState = len(state)
 		fmt.Print("\033[2K\r" + "[" + console.currentChannel + "]> " + string(state) + arrowState)
-		ch, numOfBytes := getChar(os.Stdin)
+		bytes, numOfBytes := getChar(os.Stdin)
+		ch := []rune(string(bytes[:numOfBytes]))
 		switch ch[0] {
 		case BACKSPACE:
 			if lenState > 0 {
@@ -205,13 +205,11 @@ func (console *Console) processConsole() (string, int) {
 					}
 				}
 			} else {
-				r, _ := utf8.DecodeRune([]byte{ch[1]})
-				state = append(state, r)
+				state = append(state, ch[1])
 			}
 		default:
 			n := lenState - arrowPointer - 1
-			r, _ := utf8.DecodeRune(ch[:numOfBytes])
-			state = append(state[:n+1], append([]rune{r}, state[n+1:]...)...)
+			state = append(state[:n+1], append(ch, state[n+1:]...)...)
 			prefixBuffer.Clear()
 			tabBuffer.Clear()
 		}
