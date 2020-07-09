@@ -145,9 +145,6 @@ func (console *Console) processConsole() (string, int) {
 					break
 				}
 			}
-			if left == -1 {
-				left = 0
-			}
 			// find index of the first occurance of '|' character on the right
 			for right = n; right < lenState; right++ {
 				if state[right] == '|' {
@@ -160,6 +157,7 @@ func (console *Console) processConsole() (string, int) {
 					break
 				}
 			}
+			fmt.Println(left, right)
 			state = append(state[:left], append([]rune(processTab(string(state[left:right]), &tabBuffer)), state[right:]...)...)
 		case ESC:
 			if numOfBytes != 3 {
