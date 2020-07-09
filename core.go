@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -359,7 +360,17 @@ type Comments struct {
 	Message              VodMessage `json:"message,omitempty"`
 }
 
-func getChatFromVods(videoId string) ([]string, error) {
+func extractId(url string) string {
+	re := regexp.MustCompile(`https://www\.twitch\.tv/videos/(.*)`)
+	s := re.FindStringSubmatch(url)
+	if s != nil {
+		return s[1]
+	}
+	return url
+}
+
+func getChatFromVods(link string) ([]string, error) {
+	videoId := extractId(link)
 	u := "https://api.twitch.tv/v5/videos/" + videoId + "/comments?cursor="
 	req, _ := http.NewRequest("GET", u, nil)
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
