@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"unicode"
@@ -96,38 +97,56 @@ func isLetter(char byte) bool {
 	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z'
 }
 
-func (console *Console) interactiveSort() {
-	var state []rune
-	var arrowPointer int
-	var lenState int
-	for {
-		strState := string(state)
-		fmt.Print("\033[H\033[J")
-		for i, _ := range console.comments {
-			if strings.Contains(console.comments[i], strState) {
-				fmt.Print(console.comments[i])
-			}
+type Renderer interface {
+	render(string, string)
+}
+
+type InteractiveRenderer struct {
+	comments *[]string
+}
+
+func (r InteractiveRenderer) render(state string, arrowState string) {
+	fmt.Print("\033[H\033[J")
+	for i, _ := range *r.comments {
+		if strings.Contains((*r.comments)[i], state) {
+			fmt.Print((*r.comments)[i])
 		}
-		fmt.Print("\033[2K\r" + "> " + strState)
-		lenState = len(state)
-		bytes, numOfBytes := getChar(os.Stdin)
-		ch := []rune(string(bytes[:numOfBytes]))
-		switch ch[0] {
-		case BACKSPACE:
-			if lenState > 0 {
-				n := lenState - arrowPointer - 1
-				if n >= 0 {
-					state = append(state[:n], state[n+1:]...)
+	}
+	fmt.Print("\033[2K\r" + "> " + state + arrowState)
+}
+
+type CoreRenderer struct {
+	currentChannel *string
+}
+
+func (r CoreRenderer) render(state string, arrowState string) {
+	fmt.Print("\033[2K\r" + "[" + *r.currentChannel + "]> " + state + arrowState)
+}
+
+func interactiveSort() {
+	var console Console
+	var comments []string
+	interactiveRenderer := InteractiveRenderer{comments: &comments}
+	for {
+		state, code := console.processConsole(interactiveRenderer)
+		if code == ENTER {
+			args := strings.Split(state, " ")
+			switch args[0] {
+			case "quit":
+				return
+			case "loadcomments":
+				fmt.Println("test")
+				var err error
+				comments, err = getChatFromVods(args[1])
+				if err != nil {
+					log.Println(err)
 				}
 			}
-		default:
-			n := lenState - arrowPointer - 1
-			state = append(state[:n+1], append(ch, state[n+1:]...)...)
 		}
 	}
 }
 
-func (console *Console) processConsole() (string, int) {
+func (console *Console) processConsole(r Renderer) (string, int) {
 	var state []rune
 	var tabBuffer Buffer
 	var prefixBuffer Buffer
@@ -137,7 +156,8 @@ func (console *Console) processConsole() (string, int) {
 	for {
 		// \033[H
 		lenState = len(state)
-		fmt.Print("\033[2K\r" + "[" + console.currentChannel + "]> " + string(state) + arrowState)
+		strState := string(state)
+		r.render(strState, arrowState)
 		bytes, numOfBytes := getChar(os.Stdin)
 		ch := []rune(string(bytes[:numOfBytes]))
 		switch ch[0] {
@@ -156,13 +176,12 @@ func (console *Console) processConsole() (string, int) {
 			tabBuffer.Clear()
 			prefixBuffer.Clear()
 		case ENTER:
-			stringState := string(state)
-			if console.commandsBuffer.Empty() || stringState != console.commandsBuffer.Back() {
-				console.commandsBuffer.Add(stringState)
+			if console.commandsBuffer.Empty() || strState != console.commandsBuffer.Back() {
+				console.commandsBuffer.Add(strState)
 			}
 			console.commandsBuffer.index = console.commandsBuffer.Size()
 			fmt.Println("")
-			return stringState, ENTER
+			return strState, ENTER
 		case TAB:
 			n := lenState - arrowPointer
 			left, right := 0, 0
@@ -198,7 +217,7 @@ func (console *Console) processConsole() (string, int) {
 				case ARROW_UP:
 					if !console.commandsBuffer.Empty() {
 						if prefixBuffer.Empty() {
-							prefixBuffer = createPrefixBuffer(string(state), &console.commandsBuffer)
+							prefixBuffer = createPrefixBuffer(strState, &console.commandsBuffer)
 						}
 						//up
 						if prefixBuffer.index != 0 {
@@ -209,7 +228,7 @@ func (console *Console) processConsole() (string, int) {
 				case ARROW_DOWN:
 					if !console.commandsBuffer.Empty() {
 						if prefixBuffer.Empty() {
-							prefixBuffer = createPrefixBuffer(string(state), &console.commandsBuffer)
+							prefixBuffer = createPrefixBuffer(strState, &console.commandsBuffer)
 						}
 						//down
 						if prefixBuffer.index >= prefixBuffer.Size()-1 {

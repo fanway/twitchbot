@@ -545,7 +545,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				fmt.Print(str)
 			}
 		case "interactivesort":
-			console.interactiveSort()
+			interactiveSort()
 		case "savechat":
 			if console.comments == nil {
 				fmt.Println("load some comments")
@@ -594,8 +594,9 @@ func main() {
 	console.currentChannel = "#"
 	botInstaces := make(map[string]*Bot)
 	setTerm()
+	coreRenderer := CoreRenderer{currentChannel: &console.currentChannel}
 	for {
-		args, status := console.processConsole()
+		args, status := console.processConsole(coreRenderer)
 		switch status {
 		case ENTER:
 			parseCommand(args, botInstaces, &console)
