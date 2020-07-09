@@ -96,6 +96,37 @@ func isLetter(char byte) bool {
 	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z'
 }
 
+func (console *Console) interactiveSort() {
+	var state []rune
+	var arrowPointer int
+	var lenState int
+	for {
+		strState := string(state)
+		fmt.Print("\033[H\033[J")
+		for i, _ := range console.comments {
+			if strings.Contains(console.comments[i], strState) {
+				fmt.Print(console.comments[i])
+			}
+		}
+		fmt.Print("\033[2K\r" + "> " + strState)
+		lenState = len(state)
+		bytes, numOfBytes := getChar(os.Stdin)
+		ch := []rune(string(bytes[:numOfBytes]))
+		switch ch[0] {
+		case BACKSPACE:
+			if lenState > 0 {
+				n := lenState - arrowPointer - 1
+				if n >= 0 {
+					state = append(state[:n], state[n+1:]...)
+				}
+			}
+		default:
+			n := lenState - arrowPointer - 1
+			state = append(state[:n+1], append(ch, state[n+1:]...)...)
+		}
+	}
+}
+
 func (console *Console) processConsole() (string, int) {
 	var state []rune
 	var tabBuffer Buffer
@@ -157,7 +188,6 @@ func (console *Console) processConsole() (string, int) {
 					break
 				}
 			}
-			fmt.Println(left, right)
 			state = append(state[:left], append([]rune(processTab(string(state[left:right]), &tabBuffer)), state[right:]...)...)
 		case ESC:
 			if numOfBytes != 3 {

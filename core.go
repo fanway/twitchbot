@@ -544,6 +544,8 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				}
 				fmt.Print(str)
 			}
+		case "interactivesort":
+			console.interactiveSort()
 		case "savechat":
 			if console.comments == nil {
 				fmt.Println("load some comments")
