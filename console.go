@@ -195,6 +195,9 @@ func (console *Console) processConsole(r Renderer) (string, int) {
 					break
 				}
 			}
+			if left < 0 {
+				left = 0
+			}
 			// find index of the first occurance of '|' character on the right
 			for right = n; right < lenState; right++ {
 				if state[right] == '|' {
