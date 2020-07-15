@@ -195,6 +195,8 @@ func (console *Console) processConsole(r Renderer) (string, int) {
 					break
 				}
 			}
+			// when lenState and arrowPointer equals to 0, for left = n - 1 becomes -1
+			// which leads to out of bounds array access
 			if left < 0 {
 				left = 0
 			}
