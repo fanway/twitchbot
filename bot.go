@@ -23,6 +23,12 @@ const (
 	TOP
 )
 
+const (
+	BotName = "funwayz"
+	Port    = "6667"
+	Server  = "irc.twitch.tv"
+)
+
 type SmartVote struct {
 	Options map[string]int
 	Votes   map[string]string
@@ -34,10 +40,7 @@ type Utils struct {
 
 type Bot struct {
 	Channel     string
-	Name        string
-	Port        string
 	OAuth       string
-	Server      string
 	Conn        net.Conn
 	File        *os.File
 	StopChannel chan struct{}
@@ -85,13 +88,13 @@ type TwitchEmotes []struct {
 // connects to twitch chat
 func (bot *Bot) Connect() {
 	var err error
-	bot.Conn, err = net.Dial("tcp", bot.Server+":"+bot.Port)
+	bot.Conn, err = net.Dial("tcp", Server+":"+Port)
 	if err != nil {
 		fmt.Printf("Unable to connect!")
 	}
 	fmt.Fprintf(bot.Conn, "CAP REQ :twitch.tv/tags\r\n")
 	fmt.Fprintf(bot.Conn, "PASS %s\r\n", bot.OAuth)
-	fmt.Fprintf(bot.Conn, "NICK %s\r\n", bot.Name)
+	fmt.Fprintf(bot.Conn, "NICK %s\r\n", BotName)
 	fmt.Fprintf(bot.Conn, "JOIN %s\r\n", bot.Channel)
 	fmt.Printf("connected to %s\n", bot.Channel)
 	wg := new(sync.WaitGroup)
@@ -200,7 +203,6 @@ func (bot *Bot) checkMessage(msg *Message) {
 	if len(split) > 1 {
 		split = append(split, msg.Text)
 	}
-	fmt.Println(bot.BadWords)
 	for i, _ := range split {
 		if _, ok := bot.BadWords[split[i]]; ok {
 			bot.warning(msg.Username, msg.ID, "Warning: Usage of explicit language", 300)
@@ -428,12 +430,9 @@ func startBot(channel string, botInstances map[string]*Bot) {
 	defer logfile.Close()
 	bot := Bot{
 		Channel:     channel,
-		Name:        "funwayz",
-		Port:        "6667",
-		OAuth:       os.Getenv("TWITCH_OAUTH_ENV"),
-		Server:      "irc.twitch.tv",
 		File:        logfile,
 		Conn:        nil,
+		OAuth:       os.Getenv("TWITCH_OAUTH_ENV"),
 		StopChannel: make(chan struct{}),
 		BadWords:    initBadWords(),
 		Authority:   initAuthority(),
