@@ -135,12 +135,17 @@ func interactiveSort() {
 			case "quit":
 				return
 			case "loadcomments":
-				fmt.Println("test")
 				var err error
 				comments, err = getChatFromVods(args[1])
 				if err != nil {
 					log.Println(err)
 				}
+			case "clearcomments":
+				if comments == nil {
+					log.Println("Load some comments")
+					continue
+				}
+				comments = nil
 			}
 		}
 	}
