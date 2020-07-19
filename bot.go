@@ -34,8 +34,17 @@ type SmartVote struct {
 	Votes   map[string]string
 }
 
+type Song struct {
+	Username string
+	Song     string
+	Duration time.Duration
+}
+
+type RequestedSongs []Song
+
 type Utils struct {
-	SmartVote SmartVote
+	SmartVote      SmartVote
+	RequestedSongs RequestedSongs
 }
 
 type Bot struct {

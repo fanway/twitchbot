@@ -101,11 +101,18 @@ func (bot *Bot) initCommands() {
 			Level:   LOW,
 			Handler: bot.RequestTrack,
 		},
+		// !song
 		"song": &Command{
 			Name:    "song",
 			Cd:      10,
 			Level:   LOW,
 			Handler: bot.CurrentTrack,
+		},
+		"mr": &Command{
+			Name:    "mr",
+			Cd:      10,
+			Level:   LOW,
+			Handler: bot.GetUserSongs,
 		},
 	}
 }
@@ -136,6 +143,60 @@ func (bot *Bot) Cooldown(command string, level int) error {
 
 func (bot *Bot) StopVoteCommand(msg *Message) error {
 	bot.Status = "Running"
+	return nil
+}
+
+// Delete all songs up to the current one
+func (req *RequestedSongs) clear() (int, error) {
+	track, err := getCurrentTrack()
+	if err != nil {
+		log.Println(err)
+		return 0, err
+	}
+	var i int
+	for i = 0; i < len(*req); i++ {
+		if (*req)[i].Song == track {
+			break
+		}
+	}
+	// How many previous songs we want to keep
+	const keep = 1
+	if i >= keep && i < len(*req) {
+		*req = (*req)[i-keep:]
+	}
+	return i, nil
+}
+
+// Get all songs that the user requested
+func (bot *Bot) GetUserSongs(msg *Message) error {
+	songs := []string{}
+	index, err := bot.Utils.RequestedSongs.clear()
+	if err != nil {
+		return err
+	}
+	var accDuration time.Duration
+	for i := index; i < len(bot.Utils.RequestedSongs); i++ {
+		if bot.Utils.RequestedSongs[i].Username == msg.Username {
+			var t string
+			if i == index {
+				t = "playing"
+			} else {
+				t = accDuration.Round(time.Second).String()
+			}
+			songs = append(songs, bot.Utils.RequestedSongs[i].Song+" ["+t+"]")
+		}
+		accDuration += bot.Utils.RequestedSongs[i].Duration
+	}
+
+	if len(songs) == 0 {
+		return errors.New("No songs found")
+	}
+
+	retMsg := " You are requested: " + songs[0]
+	for i := 1; i < len(songs); i++ {
+		retMsg += ", " + songs[i]
+	}
+	bot.SendMessage("@" + msg.Username + retMsg)
 	return nil
 }
 
@@ -408,6 +469,8 @@ func (bot *Bot) RequestTrack(msg *Message) error {
 		return err
 	}
 	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
+	bot.Utils.RequestedSongs = append(bot.Utils.RequestedSongs, Song{Username: msg.Username, Song: trackName, Duration: time.Duration(track.Tracks.Items[0].DurationMs) * time.Millisecond})
+
 	bot.SendMessage("@" + msg.Username + " " + trackName + " was added a playlist")
 	return nil
 }
