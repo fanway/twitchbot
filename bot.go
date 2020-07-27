@@ -219,6 +219,20 @@ func (bot *Bot) checkMessage(msg *Message) {
 	}
 }
 
+func (bot *Bot) pasteWriter(msg *Message) {
+	pasteFile, err := os.OpenFile("paste.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		log.Println(err)
+	}
+	defer pasteFile.Close()
+	pasteWriter := bufio.NewWriter(pasteFile)
+	_, err = fmt.Fprintf(pasteWriter, "%s\n\n", msg.Text)
+	if err != nil {
+		log.Println(err)
+	}
+	pasteWriter.Flush()
+}
+
 func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 	if strings.Contains(line, "PRIVMSG") {
 		re := regexp.MustCompile(`emotes=(.*?);|@(.*?)\.tmi\.twitch\.tv|PRIVMSG.*?:(.*)|id=(.*?);`)
@@ -243,17 +257,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			}
 		}
 		if messageLength >= 300 && messageLength <= 2000 {
-			pasteFile, err := os.OpenFile("paste.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
-			if err != nil {
-				log.Println(err)
-			}
-			defer pasteFile.Close()
-			pasteWriter := bufio.NewWriter(pasteFile)
-			_, err = fmt.Fprintf(pasteWriter, "%s\n\n", message.Text)
-			if err != nil {
-				log.Println(err)
-			}
-			pasteWriter.Flush()
+			go bot.pasteWriter(&message)
 		}
 
 		if message.Text[0] == '!' {
