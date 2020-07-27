@@ -93,10 +93,6 @@ func createPrefixBuffer(state string, commandsBuffer *Buffer) Buffer {
 	return prefixBuffer
 }
 
-func isLetter(char byte) bool {
-	return char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z'
-}
-
 type Renderer interface {
 	render(string, string)
 }
