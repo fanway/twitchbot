@@ -58,7 +58,7 @@ type Bot struct {
 	StopChannel chan struct{}
 	Authority   map[string]int
 	Status      string
-	Warn        map[string]*[]Warning
+	Warn        Warn
 	BadWords    map[string]struct{}
 	Commands    map[string]*Command
 	Utils       Utils
@@ -184,20 +184,28 @@ type Warning struct {
 	TimeCreated time.Time
 }
 
+type Warn struct {
+	sync.Mutex
+	Warnings map[string]*[]Warning
+}
+
 func (bot *Bot) timeout(username, reason string, seconds int) {
 	bot.SendMessage("/timeout " + username + " " + strconv.Itoa(seconds))
 	bot.SendMessage("@" + username + " " + reason)
 }
 
 func (bot *Bot) warning(username, id, reason string, seconds int) {
-	warnings := bot.Warn[username]
-	if warnings == nil {
+	bot.Warn.Lock()
+	defer bot.Warn.Unlock()
+	warnings, ok := bot.Warn.Warnings[username]
+	if !ok {
 		warnings = &[]Warning{}
+		bot.Warn.Warnings[username] = warnings
 	}
 	length := len(*warnings)
 	if length == 2 {
 		bot.timeout(username, "3rd warning", 86400)
-		delete(bot.Warn, username)
+		delete(bot.Warn.Warnings, username)
 		return
 	}
 	for i, _ := range *warnings {
@@ -452,6 +460,7 @@ func startBot(channel string, botInstances map[string]*Bot) {
 		StopChannel: make(chan struct{}),
 		BadWords:    initBadWords(),
 		Authority:   initAuthority(),
+		Warn:        Warn{Warnings: make(map[string]*[]Warning)},
 	}
 	botInstances[channel] = &bot
 	bot.Connect()
