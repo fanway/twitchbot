@@ -40,7 +40,10 @@ type Song struct {
 	Duration time.Duration
 }
 
-type RequestedSongs []Song
+type RequestedSongs struct {
+	sync.RWMutex
+	Songs []Song
+}
 
 type Utils struct {
 	SmartVote      SmartVote
