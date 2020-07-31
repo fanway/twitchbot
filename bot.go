@@ -218,7 +218,7 @@ func (bot *Bot) warning(username, id, reason string, seconds int) {
 	bot.timeout(username, reason, seconds)
 }
 
-func (bot *Bot) checkMessage(msg *Message) {
+func (bot *Bot) checkMessage(msg *Message) bool {
 	split := strings.Split(msg.Text, " ")
 	if len(split) > 1 {
 		split = append(split, msg.Text)
@@ -226,8 +226,10 @@ func (bot *Bot) checkMessage(msg *Message) {
 	for i, _ := range split {
 		if _, ok := bot.BadWords[split[i]]; ok {
 			bot.warning(msg.Username, msg.ID, "Warning: Usage of explicit language", 300)
+			return true
 		}
 	}
+	return false
 }
 
 func (bot *Bot) pasteWriter(msg *Message) {
@@ -255,15 +257,27 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			Text:     match[5][3],
 		}
 		logChan <- message
-		go bot.checkMessage(&message)
 		messageLength := len(message.Text)
-		if bot.Status == "smartvote" && messageLength == 1 {
-			// check if there is that vote option
-			if _, ok := bot.Utils.SmartVote.Options[message.Text]; ok {
-				// consider only the first vote
-				if _, ok := bot.Utils.SmartVote.Votes[message.Username]; !ok {
-					bot.Utils.SmartVote.Options[message.Text]++
-					bot.Utils.SmartVote.Votes[message.Username] = message.Text
+		switch bot.Status {
+		case "Running":
+			if messageLength >= 300 && messageLength <= 2000 {
+				go bot.pasteWriter(&message)
+			}
+			if bot.checkMessage(&message) {
+				return
+			}
+			if message.Text[0] == '!' {
+				bot.processCommands(&message)
+			}
+		case "Smartvote":
+			if messageLength == 1 {
+				// check if there is that vote option
+				if _, ok := bot.Utils.SmartVote.Options[message.Text]; ok {
+					// consider only the first vote
+					if _, ok := bot.Utils.SmartVote.Votes[message.Username]; !ok {
+						bot.Utils.SmartVote.Options[message.Text]++
+						bot.Utils.SmartVote.Votes[message.Username] = message.Text
+					}
 				}
 			}
 		}

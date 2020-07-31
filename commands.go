@@ -274,7 +274,7 @@ func (bot *Bot) SmartVoteCommand(msg *Message) error {
 	_, params := msg.extractCommand()
 	bot.Utils.SmartVote.Options = make(map[string]int)
 	bot.Utils.SmartVote.Votes = make(map[string]string)
-	bot.Status = "smartvote"
+	bot.Status = "Smartvote"
 	split := strings.Split(params, "-")
 	if len(split) < 2 {
 		return errors.New("!smartvote: not enough args")
@@ -297,7 +297,7 @@ func (bot *Bot) SmartVoteCommand(msg *Message) error {
 }
 
 func (bot *Bot) VoteOptionsCommand(msg *Message) error {
-	if bot.Status != "smartvote" {
+	if bot.Status != "Smartvote" {
 		return errors.New("There is not any vote")
 	}
 	length := len(bot.Utils.SmartVote.Options)
