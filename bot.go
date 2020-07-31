@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -48,6 +49,7 @@ type RequestedSongs struct {
 type Utils struct {
 	SmartVote      SmartVote
 	RequestedSongs RequestedSongs
+	Spam           Spam
 }
 
 type Bot struct {
@@ -194,6 +196,10 @@ func (bot *Bot) timeout(username, reason string, seconds int) {
 	bot.SendMessage("@" + username + " " + reason)
 }
 
+func (bot *Bot) ban(username string) {
+	bot.SendMessage("/ban " + username)
+}
+
 func (bot *Bot) warning(username, id, reason string, seconds int) {
 	bot.Warn.Lock()
 	defer bot.Warn.Unlock()
@@ -246,6 +252,38 @@ func (bot *Bot) pasteWriter(msg *Message) {
 	pasteWriter.Flush()
 }
 
+func (bot *Bot) SpamHistory(spamMsg string, duration time.Duration) error {
+	if _, err := bot.File.Seek(0, io.SeekStart); err != nil {
+		panic(err)
+	}
+	r := bufio.NewScanner(bot.File)
+	timeEnd := time.Now()
+	timeStart := timeEnd.Add(-duration)
+	for r.Scan() {
+		str := r.Text()
+		username, err := logsParse(str, spamMsg, "all", timeStart, timeEnd)
+		if err != nil {
+			continue
+		}
+		bot.ban(username)
+		if err := r.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (spam *Spam) Add(spamMsg string) {
+	spam.Lock()
+	spam.Messages = append(spam.Messages, spamMsg)
+	spam.Unlock()
+}
+
+type Spam struct {
+	sync.RWMutex
+	Messages []string
+}
+
 func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 	if strings.Contains(line, "PRIVMSG") {
 		re := regexp.MustCompile(`emotes=(.*?);|@(.*?)\.tmi\.twitch\.tv|PRIVMSG.*?:(.*)|id=(.*?);`)
@@ -280,14 +318,16 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 					}
 				}
 			}
-		}
-		if messageLength >= 300 && messageLength <= 2000 {
-			go bot.pasteWriter(&message)
+		case "SpamAttack":
+			bot.Utils.Spam.RLock()
+			for i, _ := range bot.Utils.Spam.Messages {
+				if strings.Contains(message.Text, bot.Utils.Spam.Messages[i]) {
+					bot.ban(message.Username)
+				}
+			}
+			bot.Utils.Spam.RUnlock()
 		}
 
-		if message.Text[0] == '!' {
-			bot.processCommands(&message)
-		}
 	} else if strings.HasPrefix(line, "PING") { // response to keep connection alive
 		bot.Pong(line)
 	}
