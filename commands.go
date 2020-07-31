@@ -217,16 +217,20 @@ func parseLogTime(start, end string) (time.Time, time.Time, error) {
 	return timeStart, timeEnd, nil
 }
 
-func logsParse(str, username string, timeStart, timeEnd time.Time) (string, error) {
+func logsParse(str, msg, username string, timeStart, timeEnd time.Time) (string, error) {
 	layout := "2006-01-02 15:04:05 -0700 MST"
-	re := regexp.MustCompile(`\[(.*?)]| (.*?):`)
-	match := re.FindAllStringSubmatch(str, -1)
-	timeq, err := time.Parse(layout, match[0][1])
+	re := regexp.MustCompile(`\[(.*?)\] (.*?): (.*)`)
+	match := re.FindStringSubmatch(str)
+	timeq, err := time.Parse(layout, match[1])
 	if err != nil {
 		return "", err
 	}
 	if timeq.Before(timeEnd) && timeq.After(timeStart) {
-		if username == match[1][2] || username == "all" {
+		if msg != "" {
+			if strings.Contains(match[3], msg) {
+				return match[2], nil
+			}
+		} else if username == match[2] || username == "all" {
 			return str, nil
 		}
 	}
@@ -255,7 +259,7 @@ func (bot *Bot) LogsCommand(msg *Message) error {
 	r := bufio.NewScanner(bot.File)
 	for r.Scan() {
 		str := r.Text()
-		parsedStr, err := logsParse(str, username, timeStart, timeEnd)
+		parsedStr, err := logsParse(str, "", username, timeStart, timeEnd)
 		if err != nil {
 			continue
 		}

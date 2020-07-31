@@ -538,7 +538,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 			username := commentsArgs[0]
 			for _, comment := range console.comments {
-				str, err := logsParse(comment, username, timeStart, timeEnd)
+				str, err := logsParse(comment, "", username, timeStart, timeEnd)
 				if err != nil {
 					continue
 				}
