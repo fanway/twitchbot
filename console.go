@@ -131,6 +131,9 @@ func interactiveSort() {
 			case "quit":
 				return
 			case "loadcomments":
+				if len(args) <= 1 {
+					continue
+				}
 				var err error
 				comments, err = getChatFromVods(args[1])
 				if err != nil {
