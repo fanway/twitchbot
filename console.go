@@ -120,11 +120,10 @@ func (r CoreRenderer) render(state string, arrowState string) {
 }
 
 func interactiveSort() {
-	var console Console
 	var comments []string
-	interactiveRenderer := InteractiveRenderer{comments: &comments}
+	console := Console{renderer: InteractiveRenderer{comments: &comments}}
 	for {
-		state, code := console.processConsole(interactiveRenderer)
+		state, code := console.processConsole()
 		if code == ENTER {
 			args := strings.Split(state, " ")
 			switch args[0] {
@@ -150,18 +149,42 @@ func interactiveSort() {
 	}
 }
 
-func (console *Console) processConsole(r Renderer) (string, int) {
-	var state []rune
+type Console struct {
+	commandsBuffer Buffer
+	currentChannel string
+	comments       []string
+	renderer       Renderer
+	state          []rune
+	arrowState     string
+}
+
+func (console *Console) Print(line string) {
+	fmt.Print("\033[2K\r")
+	fmt.Print(line)
+	console.renderer.render(string(console.state), console.arrowState)
+}
+
+func (console *Console) Println(line string) {
+	fmt.Print("\033[2K\r")
+	fmt.Println(line)
+	console.renderer.render(string(console.state), console.arrowState)
+}
+
+func (console *Console) clearState() {
+	console.state = []rune{}
+	console.arrowState = ""
+}
+
+func (console *Console) processConsole() (string, int) {
 	var tabBuffer Buffer
 	var prefixBuffer Buffer
 	var arrowPointer int
-	var arrowState string
 	var lenState int
 	for {
 		// \033[H
-		lenState = len(state)
-		strState := string(state)
-		r.render(strState, arrowState)
+		lenState = len(console.state)
+		strState := string(console.state)
+		console.renderer.render(strState, console.arrowState)
 		bytes, numOfBytes := getChar(os.Stdin)
 		ch := []rune(string(bytes[:numOfBytes]))
 		switch ch[0] {
@@ -169,11 +192,11 @@ func (console *Console) processConsole(r Renderer) (string, int) {
 			if lenState > 0 {
 				n := lenState - arrowPointer - 1
 				if n >= 0 {
-					state = append(state[:n], state[n+1:]...)
-					arrowState = ""
+					console.state = append(console.state[:n], console.state[n+1:]...)
+					console.arrowState = ""
 					// TODO: rethink this part
 					for i := 0; i < arrowPointer; i++ {
-						arrowState += "\033[D"
+						console.arrowState += "\033[D"
 					}
 				}
 			}
@@ -185,15 +208,16 @@ func (console *Console) processConsole(r Renderer) (string, int) {
 			}
 			console.commandsBuffer.index = console.commandsBuffer.Size()
 			fmt.Println("")
+			console.clearState()
 			return strState, ENTER
 		case TAB:
 			n := lenState - arrowPointer
 			left, right := 0, 0
 			// find index of the first occurance of '|' character on the left
 			for left = n - 1; left > 0; left-- {
-				if state[left] == '|' {
+				if console.state[left] == '|' {
 					// Trim any non letters
-					for left < lenState && !unicode.IsLetter(state[left]) {
+					for left < lenState && !unicode.IsLetter(console.state[left]) {
 						left++
 					}
 					break
@@ -206,9 +230,9 @@ func (console *Console) processConsole(r Renderer) (string, int) {
 			}
 			// find index of the first occurance of '|' character on the right
 			for right = n; right < lenState; right++ {
-				if state[right] == '|' {
+				if console.state[right] == '|' {
 					// Trim any non letters
-					for !unicode.IsLetter(state[right]) {
+					for !unicode.IsLetter(console.state[right]) {
 						right--
 					}
 					// for convenience to use in the slice ranges
@@ -216,7 +240,7 @@ func (console *Console) processConsole(r Renderer) (string, int) {
 					break
 				}
 			}
-			state = append(state[:left], append([]rune(processTab(string(state[left:right]), &tabBuffer)), state[right:]...)...)
+			console.state = append(console.state[:left], append([]rune(processTab(string(console.state[left:right]), &tabBuffer)), console.state[right:]...)...)
 		case ESC:
 			if numOfBytes != 3 {
 				continue
@@ -231,7 +255,7 @@ func (console *Console) processConsole(r Renderer) (string, int) {
 						//up
 						if prefixBuffer.index != 0 {
 							prefixBuffer.index--
-							state = []rune(prefixBuffer.Get())
+							console.state = []rune(prefixBuffer.Get())
 						}
 					}
 				case ARROW_DOWN:
@@ -241,31 +265,31 @@ func (console *Console) processConsole(r Renderer) (string, int) {
 						}
 						//down
 						if prefixBuffer.index >= prefixBuffer.Size()-1 {
-							state = []rune(prefixBuffer.Back())
+							console.state = []rune(prefixBuffer.Back())
 						} else {
 							prefixBuffer.index++
-							state = []rune(prefixBuffer.Get())
+							console.state = []rune(prefixBuffer.Get())
 						}
 					}
 				case ARROW_LEFT:
 					if arrowPointer < lenState {
 						//left
 						arrowPointer++
-						arrowState += "\033[D"
+						console.arrowState += "\033[D"
 					}
 				case ARROW_RIGHT:
 					if arrowPointer > 0 {
 						//right
 						arrowPointer--
-						arrowState += "\033[C"
+						console.arrowState += "\033[C"
 					}
 				}
 			} else {
-				state = append(state, ch[1])
+				console.state = append(console.state, ch[1])
 			}
 		default:
 			n := lenState - arrowPointer - 1
-			state = append(state[:n+1], append(ch, state[n+1:]...)...)
+			console.state = append(console.state[:n+1], append(ch, console.state[n+1:]...)...)
 			prefixBuffer.Clear()
 			tabBuffer.Clear()
 		}

@@ -91,7 +91,7 @@ func connectDb() *sql.DB {
 	return db
 }
 
-func findPerson(name string) {
+func findPerson(console *Console, name string) {
 	db := connectDb()
 	defer db.Close()
 	tx, err := db.Begin()
@@ -166,16 +166,16 @@ func findPerson(name string) {
 		online = true
 	}
 	if online {
-		fmt.Println(name + " [ONLINE]")
+		console.Println(name + " [ONLINE]")
 	} else {
-		fmt.Println(name + " [OFFLINE]")
+		console.Println(name + " [OFFLINE]")
 	}
-	fmt.Println("-----------------------")
+	console.Println("-----------------------")
 
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println("New channels: ")
+	console.Println("New channels: ")
 	for rows.Next() {
 		var idx int
 		var fromId string
@@ -193,7 +193,7 @@ func findPerson(name string) {
 			log.Println(err)
 		}
 	}
-	fmt.Println("")
+	console.Println("")
 
 	rows, err = tx.Query("SELECT t.Id, t.ToName FROM Followers t WHERE t.FromId=$1 AND NOT EXISTS (SELECT * FROM temp.Follow tm WHERE tm.ToId=t.ToId);", id)
 
@@ -202,7 +202,7 @@ func findPerson(name string) {
 		log.Println(err)
 	}
 
-	fmt.Println("Unfollowed channels: ")
+	console.Println("Unfollowed channels: ")
 	for rows.Next() {
 		var idx int
 		var toName string
@@ -216,7 +216,7 @@ func findPerson(name string) {
 			log.Println(err)
 		}
 	}
-	fmt.Println("")
+	console.Println("")
 
 	rows, err = tx.Query("SELECT ToName FROM Followers WHERE FromId=$1;", id)
 	defer rows.Close()
@@ -224,12 +224,12 @@ func findPerson(name string) {
 		log.Println(err)
 	}
 	if !online {
-		fmt.Println("-----------------------")
+		console.Println("-----------------------")
 		tx.Commit()
 		return
 	}
 	name = strings.ToLower(name)
-	fmt.Println("Currently watching: ")
+	console.Println("Currently watching: ")
 	for rows.Next() {
 		var toName string
 		rows.Scan(&toName)
@@ -243,24 +243,24 @@ func findPerson(name string) {
 
 		for _, cname := range chatData.Chatters.Vips {
 			if cname == name {
-				fmt.Print(toName + " ")
+				console.Print(toName + " ")
 			}
 		}
 
 		for _, cname := range chatData.Chatters.Moderators {
 			if cname == name {
-				fmt.Print(toName + " ")
+				console.Print(toName + " ")
 			}
 		}
 
 		for _, cname := range chatData.Chatters.Viewers {
 			if cname == name {
-				fmt.Print(toName + " ")
+				console.Print(toName + " ")
 			}
 		}
 	}
 	tx.Commit()
-	fmt.Println("\n-----------------------")
+	console.Println("\n-----------------------")
 }
 
 func personsList(prefix string) []string {
@@ -440,7 +440,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				}
 				fmt.Println("")
 			} else {
-				findPerson(args[0])
+				findPerson(console, args[0])
 			}
 		case "asciify":
 			//fmt.Println(asciify(args))
@@ -468,7 +468,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 		case "clear":
 			if len(args) == 0 {
-				fmt.Print("\033[H\033[J")
+				console.Print("\033[H\033[J")
 				break
 			}
 			if args[0] == "buffer" {
@@ -600,12 +600,6 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 	}
 }
 
-type Console struct {
-	commandsBuffer Buffer
-	currentChannel string
-	comments       []string
-}
-
 func main() {
 	var console Console
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -613,11 +607,12 @@ func main() {
 	botInstaces := make(map[string]*Bot)
 	setTerm()
 	coreRenderer := CoreRenderer{currentChannel: &console.currentChannel}
+	console.renderer = coreRenderer
 	for {
-		args, status := console.processConsole(coreRenderer)
+		args, status := console.processConsole()
 		switch status {
 		case ENTER:
-			parseCommand(args, botInstaces, &console)
+			go parseCommand(args, botInstaces, &console)
 		}
 	}
 }
