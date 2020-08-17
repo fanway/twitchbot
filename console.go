@@ -158,15 +158,33 @@ type Console struct {
 	arrowState     string
 }
 
-func (console *Console) Print(line string) {
+func (console *Console) Print(a ...interface{}) {
 	fmt.Print("\033[2K\r")
-	fmt.Print(line)
+	fmt.Print("\033[u")
+	for i, _ := range a {
+		if i > 0 {
+			fmt.Print(' ')
+		}
+		fmt.Print(a[i])
+	}
+	fmt.Print("\033[s")
+	fmt.Println()
+	fmt.Println()
 	console.renderer.render(string(console.state), console.arrowState)
 }
 
-func (console *Console) Println(line string) {
+func (console *Console) Println(a ...interface{}) {
 	fmt.Print("\033[2K\r")
-	fmt.Println(line)
+	fmt.Print("\033[u")
+	for i, _ := range a {
+		if i > 0 {
+			fmt.Print(' ')
+		}
+		fmt.Print(a[i])
+	}
+	fmt.Println()
+	fmt.Print("\033[s")
+	fmt.Println()
 	console.renderer.render(string(console.state), console.arrowState)
 }
 
@@ -180,6 +198,7 @@ func (console *Console) processConsole() (string, int) {
 	var prefixBuffer Buffer
 	var arrowPointer int
 	var lenState int
+	fmt.Print("\033[s")
 	for {
 		// \033[H
 		lenState = len(console.state)
