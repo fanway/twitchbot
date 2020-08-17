@@ -421,7 +421,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 		switch command {
 		case "connect":
 			if len(args) != 1 {
-				fmt.Println("Provide channel name")
+				console.Println("Provide channel name")
 				break
 			}
 			if _, ok := botInstances[args[0]]; !ok {
@@ -430,27 +430,27 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			console.currentChannel = args[0]
 		case "find":
 			if len(args) != 1 {
-				fmt.Println("Provide channel name")
+				console.Println("Provide channel name")
 				break
 			}
 			if args[0] == "list" {
 				rows := personsList("%")
 				for i := range rows {
-					fmt.Print(rows[i] + " ")
+					console.Print(rows[i] + " ")
 				}
-				fmt.Println("")
+				console.Println("")
 			} else {
 				findPerson(console, args[0])
 			}
 		case "asciify":
-			//fmt.Println(asciify(args))
+			//console.Println(asciify(args))
 		case "disconnect":
 			if len(args) != 1 {
-				fmt.Println("Provide channel name")
+				console.Println("Provide channel name")
 				break
 			}
 			if _, ok := botInstances[args[0]]; !ok {
-				fmt.Println("No such channel")
+				console.Println("No such channel")
 				break
 			}
 			botInstances[args[0]].Disconnect()
@@ -458,13 +458,13 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			console.currentChannel = "#"
 		case "change":
 			if len(args) != 3 {
-				fmt.Println("Provide valid args")
+				console.Println("Provide valid args")
 				break
 			}
 			if _, ok := botInstances[args[0]]; ok {
 				botInstances[args[0]].changeAuthority(args[1], args[2])
 			} else {
-				fmt.Println("Provide valid channel name to which bot is currently connected")
+				console.Println("Provide valid channel name to which bot is currently connected")
 			}
 		case "clear":
 			if len(args) == 0 {
@@ -476,17 +476,17 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 		case "loademotes":
 			if len(botInstances) == 0 {
-				fmt.Println("You are not connected to any channel")
+				console.Println("You are not connected to any channel")
 				break
 			}
 			go botInstances[console.currentChannel].updateEmotes()
 		case "send":
 			if len(args) < 1 {
-				fmt.Println("write message")
+				console.Println("write message")
 				break
 			}
 			if console.currentChannel == "#" {
-				fmt.Println("connect to chat")
+				console.Println("connect to chat")
 				break
 			}
 			str := args[0]
@@ -504,7 +504,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				log.Println(err)
 				break
 			}
-			fmt.Println(msg)
+			console.Println(msg)
 		case "spam":
 			bot := botInstances[console.currentChannel]
 			if len(args) != 2 {
@@ -512,7 +512,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 					bot.Status = "Running"
 					break
 				}
-				fmt.Println("Not enough args")
+				console.Println("Not enough args")
 				break
 			}
 			duration, err := time.ParseDuration(args[1])
@@ -525,7 +525,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			bot.Status = "SpamAttack"
 		case "loadcomments":
 			if len(args) != 1 {
-				fmt.Println("something went wrong")
+				console.Println("something went wrong")
 				break
 			}
 			var err error
@@ -535,7 +535,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 		case "sortcomments":
 			if console.comments == nil {
-				fmt.Println("load some comments")
+				console.Println("load some comments")
 				break
 			}
 			var timeStart time.Time
@@ -560,13 +560,13 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				if err != nil {
 					continue
 				}
-				fmt.Print(str)
+				console.Print(str)
 			}
 		case "interactivesort":
 			interactiveSort()
 		case "savechat":
 			if console.comments == nil {
-				fmt.Println("load some comments")
+				console.Println("load some comments")
 				break
 			}
 			file, err := os.OpenFile("vod.log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
@@ -581,19 +581,19 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			defer file.Close()
 		case "clearcomments":
 			if console.comments == nil {
-				fmt.Println("load some comments")
+				console.Println("load some comments")
 				break
 			}
 			console.comments = nil
 		case "searchtrack":
 			track, err := searchTrack(s[strings.Index(s, " ")+1:])
 			if err != nil {
-				fmt.Println(err)
+				console.Println(err)
 				break
 			}
 			addToPlaylist(track.Tracks.Items[0].URI)
 		case "currenttrack":
-			fmt.Println(getCurrentTrack())
+			console.Println(getCurrentTrack())
 		case "nexttrack":
 			skipToNextTrack()
 		}
