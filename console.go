@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -156,18 +157,25 @@ type Console struct {
 	renderer       Renderer
 	state          []rune
 	arrowState     string
+	cursorW        int
 }
 
 func (console *Console) Print(a ...interface{}) {
 	fmt.Print("\033[2K\r")
-	fmt.Print("\033[u")
+	if console.cursorW != 0 {
+		fmt.Print("\033[2F")
+		fmt.Print("\033[" + strconv.Itoa(console.cursorW) + "C")
+	} else {
+		fmt.Print("\033[1F")
+	}
 	for i, _ := range a {
 		if i > 0 {
 			fmt.Print(' ')
+			console.cursorW += 1
 		}
 		fmt.Print(a[i])
+		console.cursorW += len(a[i].(string))
 	}
-	fmt.Print("\033[s")
 	fmt.Println()
 	fmt.Println()
 	console.renderer.render(string(console.state), console.arrowState)
@@ -175,7 +183,12 @@ func (console *Console) Print(a ...interface{}) {
 
 func (console *Console) Println(a ...interface{}) {
 	fmt.Print("\033[2K\r")
-	fmt.Print("\033[u")
+	if console.cursorW != 0 {
+		fmt.Print("\033[2F")
+		fmt.Print("\033[" + strconv.Itoa(console.cursorW) + "C")
+	} else {
+		fmt.Print("\033[1F")
+	}
 	for i, _ := range a {
 		if i > 0 {
 			fmt.Print(' ')
@@ -183,14 +196,15 @@ func (console *Console) Println(a ...interface{}) {
 		fmt.Print(a[i])
 	}
 	fmt.Println()
-	fmt.Print("\033[s")
 	fmt.Println()
+	console.cursorW = 0
 	console.renderer.render(string(console.state), console.arrowState)
 }
 
 func (console *Console) clearState() {
 	console.state = []rune{}
 	console.arrowState = ""
+	console.cursorW = 0
 }
 
 func (console *Console) processConsole() (string, int) {
@@ -198,7 +212,6 @@ func (console *Console) processConsole() (string, int) {
 	var prefixBuffer Buffer
 	var arrowPointer int
 	var lenState int
-	fmt.Print("\033[s")
 	for {
 		// \033[H
 		lenState = len(console.state)
@@ -226,7 +239,8 @@ func (console *Console) processConsole() (string, int) {
 				console.commandsBuffer.Add(strState)
 			}
 			console.commandsBuffer.index = console.commandsBuffer.Size()
-			fmt.Println("")
+			fmt.Println()
+			fmt.Println()
 			console.clearState()
 			return strState, ENTER
 		case TAB:
