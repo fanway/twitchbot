@@ -187,7 +187,7 @@ func findPerson(console *Console, name string) {
 		if err != nil {
 			log.Println(err)
 		}
-		fmt.Print(toName + " ")
+		console.Print(toName + " ")
 		_, err = tx.Exec("INSERT INTO Followers(FromId, FromName, ToId, ToName, FollowedAt) values($1, $2, $3, $4, $5);", fromId, fromName, toId, toName, followersAt)
 		if err != nil {
 			log.Println(err)
@@ -210,7 +210,7 @@ func findPerson(console *Console, name string) {
 		if err != nil {
 			log.Println(err)
 		}
-		fmt.Print(toName + " ")
+		console.Print(toName + " ")
 		_, err = tx.Exec("DELETE FROM Followers WHERE id=$1", strconv.Itoa(idx))
 		if err != nil {
 			log.Println(err)
