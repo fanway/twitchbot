@@ -279,6 +279,12 @@ func (spam *Spam) Add(spamMsg string) {
 	spam.Unlock()
 }
 
+func (spam *Spam) Clear() {
+	spam.Lock()
+	spam.Messages = nil
+	spam.Unlock()
+}
+
 type Spam struct {
 	sync.RWMutex
 	Messages []string

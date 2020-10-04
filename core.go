@@ -507,18 +507,19 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			console.Println(msg)
 		case "spam":
 			bot := botInstances[console.currentChannel]
-			if len(args) != 2 {
-				if len(args) == 0 {
-					bot.Status = "Running"
+			duration := time.Duration(90) * time.Second
+			switch len(args) {
+			case 0:
+				bot.Status = "Running"
+				bot.Utils.Spam.Clear()
+				break
+			case 2:
+				var err error
+				duration, err = time.ParseDuration(args[1])
+				if err != nil {
+					log.Println(err)
 					break
 				}
-				console.Println("Not enough args")
-				break
-			}
-			duration, err := time.ParseDuration(args[1])
-			if err != nil {
-				log.Println(err)
-				break
 			}
 			bot.Utils.Spam.Add(args[0])
 			bot.SpamHistory(args[0], duration)
