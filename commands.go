@@ -114,6 +114,12 @@ func (bot *Bot) initCommands() {
 			Level:   LOW,
 			Handler: bot.GetUserSongs,
 		},
+		"commands": &Command{
+			Name:    "commands",
+			Cd:      3,
+			Level:   LOW,
+			Handler: bot.GetCommands,
+		},
 	}
 }
 
@@ -493,6 +499,22 @@ func (bot *Bot) CurrentTrack(msg *Message) error {
 	}
 	if track != "" {
 		bot.SendMessage("@" + msg.Username + " " + track)
+	}
+	return nil
+}
+
+func (bot *Bot) GetCommands(msg *Message) error {
+	if len(bot.Commands) == 0 {
+		return errors.New("No commands found")
+	}
+	var keys []string
+	for k := range bot.Commands {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	message := keys[0]
+	for i := 1; i < len(keys); i++ {
+		message += ", " + keys[i]
 	}
 	return nil
 }
