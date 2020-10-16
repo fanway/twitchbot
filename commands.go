@@ -517,9 +517,10 @@ func (bot *Bot) GetCommands(msg *Message) error {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	message := keys[0]
+	commands := keys[0]
 	for i := 1; i < len(keys); i++ {
-		message += ", " + keys[i]
+		commands += ", " + keys[i]
 	}
+	bot.SendMessage("@" + msg.Username + " " + commands)
 	return nil
 }
