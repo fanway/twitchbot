@@ -346,13 +346,11 @@ func (bot *Bot) processCommands(message *Message) {
 	level := bot.Authority[message.Username]
 	cmd, err = bot.parseCommand(message)
 	if err != nil {
-		bot.Status = "Running"
 		log.Println(err)
 		return
 	}
 	err = cmd.ExecCommand(level)
 	if err != nil {
-		bot.Status = "Running"
 		log.Println(err)
 		return
 	}
@@ -520,6 +518,7 @@ func startBot(channel string, botInstances map[string]*Bot) {
 		StopChannel: make(chan struct{}),
 		BadWords:    initBadWords(),
 		Authority:   initAuthority(),
+		Status:      "Running",
 		Warn:        Warn{Warnings: make(map[string]*[]Warning)},
 	}
 	botInstances[channel] = &bot
