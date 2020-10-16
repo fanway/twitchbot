@@ -120,6 +120,12 @@ func (bot *Bot) initCommands() {
 			Level:   LOW,
 			Handler: bot.GetCommands,
 		},
+		"level": &Command{
+			Name:    "level",
+			Cd:      10,
+			Level:   LOW,
+			Handler: bot.GetLevel,
+		},
 	}
 }
 
@@ -522,5 +528,20 @@ func (bot *Bot) GetCommands(msg *Message) error {
 		commands += ", " + keys[i]
 	}
 	bot.SendMessage("@" + msg.Username + " " + commands)
+	return nil
+}
+
+func (bot *Bot) GetLevel(msg *Message) error {
+	level := bot.Authority[msg.Username]
+	var message string
+	switch level {
+	case 0:
+		message = "low"
+	case 1:
+		message = "middle"
+	case 2:
+		message = "top"
+	}
+	bot.SendMessage("@" + msg.Username + " " + "Your level is: " + message)
 	return nil
 }
