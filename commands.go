@@ -124,6 +124,11 @@ func (bot *Bot) initCommands() {
 }
 
 func (cmd *Command) ExecCommand(level int) error {
+	err := cmd.Cooldown(level)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 	if level >= cmd.Level {
 		err := cmd.Handler(cmd.Params)
 		if err != nil {
@@ -134,13 +139,13 @@ func (cmd *Command) ExecCommand(level int) error {
 	return errors.New("!" + cmd.Name + ": Not enough rights")
 }
 
-func (bot *Bot) Cooldown(command string, level int) error {
+func (cmd *Command) Cooldown(level int) error {
 	if level >= TOP {
 		return nil
 	}
-	t := time.Since(bot.Commands[command].LastUsage)
-	if t >= time.Duration(bot.Commands[command].Cd)*time.Second {
-		bot.Commands[command].LastUsage = time.Now()
+	t := time.Since(cmd.LastUsage)
+	if t >= time.Duration(cmd.Cd)*time.Second {
+		cmd.LastUsage = time.Now()
 		return nil
 	} else {
 		return errors.New("Command on cooldown")
