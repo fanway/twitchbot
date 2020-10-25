@@ -37,7 +37,8 @@ type SmartVote struct {
 
 type Song struct {
 	Username string
-	Song     string
+	SongName string
+	Uri      string
 	Duration time.Duration
 }
 

@@ -204,7 +204,7 @@ func (bot *Bot) GetUserSongs(msg *Message) error {
 			} else {
 				t = accDuration.Round(time.Second).String()
 			}
-			songs = append(songs, bot.Utils.RequestedSongs.Songs[i].Song+" ["+t+"]")
+			songs = append(songs, bot.Utils.RequestedSongs.Songs[i].SongName+" ["+t+"]")
 		}
 		accDuration += bot.Utils.RequestedSongs.Songs[i].Duration
 	}
@@ -213,11 +213,73 @@ func (bot *Bot) GetUserSongs(msg *Message) error {
 		return errors.New("No songs found")
 	}
 
-	retMsg := " You are requested: " + songs[0]
+	retMsg := " Your requested songs: " + songs[0]
 	for i := 1; i < len(songs); i++ {
 		retMsg += ", " + songs[i]
 	}
 	bot.SendMessage("@" + msg.Username + retMsg)
+	return nil
+}
+
+func (bot *Bot) RequestTrack(msg *Message) error {
+	_, params := msg.extractCommand()
+	track, err := searchTrack(params)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	if len(track.Tracks.Items) == 0 {
+		bot.SendMessage("@" + msg.Username + " track wasn't found")
+		return errors.New("Track wasn't found")
+	}
+
+	err = addToPlaylist(track.Tracks.Items[0].URI)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
+	bot.Utils.RequestedSongs.Lock()
+	defer bot.Utils.RequestedSongs.Unlock()
+	bot.Utils.RequestedSongs.Songs = append(bot.Utils.RequestedSongs.Songs, Song{Username: msg.Username, SongName: trackName, Uri: track.Tracks.Items[0].URI, Duration: time.Duration(track.Tracks.Items[0].DurationMs) * time.Millisecond})
+	bot.SendMessage("@" + msg.Username + " " + trackName + " was added a playlist")
+	return nil
+}
+
+func (bot *Bot) RemoveRequestedTrack(msg *Message) error {
+	_, params := msg.extractCommand()
+	index, err := bot.Utils.RequestedSongs.clear()
+	if err != nil {
+		return err
+	}
+	err = removeTrack(bot.Utils.RequestedSongs.Songs[index].Uri)
+	if err != nil {
+		return nil
+	}
+	bot.Utils.RequestedSongs.Lock()
+	defer bot.Utils.RequestedSongs.Unlock()
+	i := len(bot.Utils.RequestedSongs.Songs)
+	for ; i >= 0; i-- {
+		if params == bot.Utils.RequestedSongs.Songs[i].SongName {
+			break
+		}
+	}
+	if i == -1 {
+		return errors.New("No track found")
+	}
+	bot.Utils.RequestedSongs.Songs = append(bot.Utils.RequestedSongs.Songs[:i], bot.Utils.RequestedSongs.Songs[i+1:]...)
+	return nil
+}
+
+func (bot *Bot) CurrentTrack(msg *Message) error {
+	track, err := getCurrentTrack()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	if track != "" {
+		bot.SendMessage("@" + msg.Username + " " + track)
+	}
 	return nil
 }
 
@@ -473,44 +535,6 @@ func (bot *Bot) Markov(msg *Message) error {
 		return err
 	}
 	bot.SendMessage("@" + msg.Username + " " + markovMsg)
-	return nil
-}
-
-func (bot *Bot) RequestTrack(msg *Message) error {
-	_, params := msg.extractCommand()
-	track, err := searchTrack(params)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	if len(track.Tracks.Items) == 0 {
-		bot.SendMessage("@" + msg.Username + " track wasn't found")
-		return errors.New("Track wasn't found")
-	}
-
-	err = addToPlaylist(track.Tracks.Items[0].URI)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
-	bot.Utils.RequestedSongs.Lock()
-	defer bot.Utils.RequestedSongs.Unlock()
-	bot.Utils.RequestedSongs.Songs = append(bot.Utils.RequestedSongs.Songs, Song{Username: msg.Username, Song: trackName, Duration: time.Duration(track.Tracks.Items[0].DurationMs) * time.Millisecond})
-
-	bot.SendMessage("@" + msg.Username + " " + trackName + " was added a playlist")
-	return nil
-}
-
-func (bot *Bot) CurrentTrack(msg *Message) error {
-	track, err := getCurrentTrack()
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	if track != "" {
-		bot.SendMessage("@" + msg.Username + " " + track)
-	}
 	return nil
 }
 
