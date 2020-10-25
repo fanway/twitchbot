@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -249,4 +250,18 @@ func skipToNextTrack() {
 		fmt.Println(err)
 		return
 	}
+}
+
+func removeTrack(uri string) error {
+	auth := checkAuth()
+	url := "https://api.spotify.com/v1/playlists/6U9yUDYW4uN845DUERRiMH//tracks"
+	req, _ := http.NewRequest("DELETE", url, bytes.NewBuffer([]byte("spotify:track:"+uri)))
+	req.Header.Set("Authorization", "Bearer "+auth)
+	req.Header.Set("Content-Type", "application/json")
+	err := requestJSON(req, 10, nil)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	return nil
 }
