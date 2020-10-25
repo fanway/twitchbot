@@ -173,17 +173,21 @@ func (req *RequestedSongs) clear() (int, error) {
 	req.Lock()
 	defer req.Unlock()
 	var i int
-	for i = 0; i < len(req.Songs); i++ {
-		if req.Songs[i].Song == track {
+	reqLength := len(req.Songs)
+	for i = 0; i < reqLength; i++ {
+		if req.Songs[i].SongName == track {
 			break
 		}
+	}
+	if i == reqLength {
+		return 0, errors.New("No songs found")
 	}
 	// How many previous songs we want to keep
 	const keep = 1
 	if i >= keep && i < len(req.Songs) {
 		req.Songs = req.Songs[i-keep:]
 	}
-	return i, nil
+	return keep, nil
 }
 
 // Get all songs that the user requested
