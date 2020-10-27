@@ -618,7 +618,7 @@ func main() {
 		args, status := console.processConsole()
 		switch status {
 		case ENTER:
-			go parseCommand(args, botInstaces, &console)
+			parseCommand(args, botInstaces, &console)
 		}
 	}
 }
