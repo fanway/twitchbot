@@ -246,7 +246,7 @@ func (bot *Bot) RequestTrack(msg *Message) error {
 	bot.Utils.RequestedSongs.Lock()
 	defer bot.Utils.RequestedSongs.Unlock()
 	bot.Utils.RequestedSongs.Songs = append(bot.Utils.RequestedSongs.Songs, Song{Username: msg.Username, SongName: trackName, Uri: track.Tracks.Items[0].URI, Duration: time.Duration(track.Tracks.Items[0].DurationMs) * time.Millisecond})
-	bot.SendMessage("@" + msg.Username + " " + trackName + " was added a playlist")
+	bot.SendMessage("@" + msg.Username + " " + trackName + " was added to the playlist")
 	return nil
 }
 
