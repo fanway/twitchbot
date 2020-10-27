@@ -223,11 +223,11 @@ func findPerson(console *Console, name string) {
 	if err != nil {
 		log.Println(err)
 	}
-	if !online {
-		console.Println("-----------------------")
-		tx.Commit()
-		return
-	}
+	//if !online {
+	//	console.Println("-----------------------")
+	//	tx.Commit()
+	//	return
+	//}
 	name = strings.ToLower(name)
 	console.Println("Currently watching: ")
 	for rows.Next() {
