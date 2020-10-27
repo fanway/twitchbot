@@ -594,7 +594,12 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 			addToPlaylist(track.Tracks.Items[0].URI)
 		case "currenttrack":
-			console.Println(getCurrentTrack())
+			track, err := getCurrentTrack()
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			console.Println(track)
 		case "nexttrack":
 			skipToNextTrack()
 		}
