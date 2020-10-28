@@ -431,7 +431,7 @@ func (bot *Bot) updateEmotes() {
 	ffzUrl := "https://api.frankerfacez.com/v1/room/" + bot.Channel[1:]
 	var ffz map[string]interface{}
 	req, _ := http.NewRequest("GET", ffzUrl, nil)
-	err = requestJSON(req, 10, &ffz)
+	err = request.JSON(req, 10, &ffz)
 	if err != nil {
 		log.Println(err)
 		return
@@ -461,7 +461,7 @@ func (bot *Bot) updateEmotes() {
 	bttvUrl := "https://api.betterttv.net/3/cached/users/twitch/" + strconv.FormatInt(twitchID, 10)
 	var bttv Bttv
 	req, _ = http.NewRequest("GET", bttvUrl, nil)
-	err = requestJSON(req, 10, &bttv)
+	err = request.JSON(req, 10, &bttv)
 	if err != nil {
 		log.Println(err)
 	}
@@ -483,7 +483,7 @@ func (bot *Bot) updateEmotes() {
 	req, _ = http.NewRequest("GET", twitchUrl, nil)
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID_"))
 	var tempTwitch map[string]json.RawMessage
-	err = requestJSON(req, 10, &tempTwitch)
+	err = request.JSON(req, 10, &tempTwitch)
 	if err != nil {
 		log.Println(err)
 		return

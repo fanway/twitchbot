@@ -109,7 +109,7 @@ func findPerson(console *Console, name string) {
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 	if err != nil {
 		var iddata IdData
-		err := requestJSON(req, 10, &iddata)
+		err := request.JSON(req, 10, &iddata)
 		if err != nil {
 			log.Println(err)
 			return
@@ -118,7 +118,7 @@ func findPerson(console *Console, name string) {
 	}
 	req.URL, _ = url.Parse("https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id)
 	var followers Followers
-	err = requestJSON(req, 10, &followers)
+	err = request.JSON(req, 10, &followers)
 	if err != nil {
 		log.Println(err)
 		return
@@ -127,7 +127,7 @@ func findPerson(console *Console, name string) {
 	for i := 0; i < followers.Total/100; i++ {
 		req.URL, _ = url.Parse("https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id + "&after=" + cursor)
 		var temp Followers
-		err = requestJSON(req, 10, &temp)
+		err = request.JSON(req, 10, &temp)
 		if err != nil {
 			log.Println(err)
 			return
@@ -156,7 +156,7 @@ func findPerson(console *Console, name string) {
 	u = "https://tmi.twitch.tv/group/user/" + strings.ToLower(name) + "/chatters"
 	req, _ = http.NewRequest("GET", u, nil)
 	var chatData ChatData
-	err = requestJSON(req, 10, &chatData)
+	err = request.JSON(req, 10, &chatData)
 	if err != nil {
 		log.Println(err)
 	}
@@ -236,7 +236,7 @@ func findPerson(console *Console, name string) {
 		u = "https://tmi.twitch.tv/group/user/" + strings.ToLower(toName) + "/chatters"
 		req, _ := http.NewRequest("GET", u, nil)
 		var chatData ChatData
-		err = requestJSON(req, 10, &chatData)
+		err = request.JSON(req, 10, &chatData)
 		if err != nil {
 			continue
 		}
@@ -375,7 +375,7 @@ func getChatFromVods(link string) ([]string, error) {
 	req, _ := http.NewRequest("GET", u, nil)
 	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
 	var vodsChat VodsChat
-	err := requestJSON(req, 10, &vodsChat)
+	err := request.JSON(req, 10, &vodsChat)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func getChatFromVods(link string) ([]string, error) {
 	for vodsChat.Next != "" {
 		req.URL, _ = url.Parse(u + vodsChat.Next)
 		vodsChat = VodsChat{}
-		err := requestJSON(req, 10, &vodsChat)
+		err := request.JSON(req, 10, &vodsChat)
 		if err != nil {
 			return nil, err
 		}
@@ -393,21 +393,6 @@ func getChatFromVods(link string) ([]string, error) {
 		messages = append(messages, newMessages...)
 	}
 	return messages, nil
-}
-
-func asciifyRequest(url string, width int, reverse bool, thMult float32) (string, error) {
-	client := &http.Client{}
-	req, _ := http.NewRequest("GET", url, nil)
-	res, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	img, _, err := image.Decode(res.Body)
-	if err != nil {
-		log.Println(err)
-	}
-	return Braille(img, width, reverse, thMult), nil
 }
 
 func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
