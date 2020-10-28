@@ -416,7 +416,7 @@ func (bot *Bot) changeAuthority(username, level string) {
 }
 
 func (bot *Bot) updateEmotes() {
-	db := connectDb()
+	db := database.Connect()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {

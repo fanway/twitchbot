@@ -63,36 +63,8 @@ type ChatData struct {
 	} `json:"chatters"`
 }
 
-func requestJSON(req *http.Request, timeout int, obj interface{}) error {
-	client := &http.Client{Timeout: time.Second * time.Duration(timeout)}
-	res, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	if res.StatusCode < http.StatusOK || res.StatusCode > http.StatusIMUsed {
-		return errors.New("HTTP status:" + strconv.Itoa(res.StatusCode))
-	}
-	defer res.Body.Close()
-	decoder := json.NewDecoder(res.Body)
-	decoder.UseNumber()
-	err = decoder.Decode(&obj)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func connectDb() *sql.DB {
-	db, err := sql.Open("sqlite3", "./data.db?_busy_timeout=5000&cache=shared&mode=rwc")
-	if err != nil {
-		panic(err)
-	}
-	db.SetMaxOpenConns(1)
-	return db
-}
-
 func findPerson(console *Console, name string) {
-	db := connectDb()
+	db := database.Connect()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
@@ -264,7 +236,7 @@ func findPerson(console *Console, name string) {
 }
 
 func personsList(prefix string) []string {
-	db := connectDb()
+	db := database.Connect()
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
