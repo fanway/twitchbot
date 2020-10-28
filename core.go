@@ -504,7 +504,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				timeEnd = time.Now()
 			} else if length == 3 {
 				var err error
-				timeStart, timeEnd, err = parseLogTime(commentsArgs[1], commentsArgs[2])
+				timeStart, timeEnd, err = logsparser.ParseTime(commentsArgs[1], commentsArgs[2])
 				if err != nil {
 					log.Println(err)
 					break
@@ -514,7 +514,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 			username := commentsArgs[0]
 			for _, comment := range console.comments {
-				str, err := logsParse(comment, "", username, timeStart, timeEnd)
+				str, err := logsparser.Parse(comment, "", username, timeStart, timeEnd)
 				if err != nil {
 					continue
 				}

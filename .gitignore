@@ -2,5 +2,5 @@
 *.txt
 *.db
 *.json
-/logs
+*.py
 .DS_Store

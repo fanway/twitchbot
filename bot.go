@@ -262,7 +262,7 @@ func (bot *Bot) SpamHistory(spamMsg string, duration time.Duration) error {
 	timeStart := timeEnd.Add(-duration)
 	for r.Scan() {
 		str := r.Text()
-		username, err := logsParse(str, spamMsg, "all", timeStart, timeEnd)
+		username, err := logsparser.Parse(str, spamMsg, "all", timeStart, timeEnd)
 		if err != nil {
 			continue
 		}
