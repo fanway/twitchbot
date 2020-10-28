@@ -499,7 +499,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				log.Println("something went wrong")
 				break
 			}
-			msg, err := Markov(args[0])
+			msg, err := markov.Markov(args[0])
 			if err != nil {
 				log.Println(err)
 				break

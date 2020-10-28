@@ -1,4 +1,4 @@
-package main
+package markov
 
 import (
 	"bufio"
@@ -19,7 +19,7 @@ func add(m map[string]map[string]int, first, second string) {
 
 func Markov(channel string) (string, error) {
 	msg := ""
-	file, err := os.Open(channel + ".log")
+	file, err := os.Open("../" + channel + ".log")
 	defer file.Close()
 	if err != nil {
 		return "", err
