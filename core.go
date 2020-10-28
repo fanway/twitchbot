@@ -587,21 +587,21 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			}
 			console.comments = nil
 		case "searchtrack":
-			track, err := searchTrack(s[strings.Index(s, " ")+1:])
+			track, err := spotify.SearchTrack(s[strings.Index(s, " ")+1:])
 			if err != nil {
 				console.Println(err)
 				break
 			}
-			addToPlaylist(track.Tracks.Items[0].URI)
+			spotify.AddToPlaylist(track.Tracks.Items[0].URI)
 		case "currenttrack":
-			track, err := getCurrentTrack()
+			track, err := spotify.GetCurrentTrack()
 			if err != nil {
 				log.Println(err)
 				break
 			}
 			console.Println(track)
 		case "nexttrack":
-			skipToNextTrack()
+			spotify.SkipToNextTrack()
 		}
 	}
 }

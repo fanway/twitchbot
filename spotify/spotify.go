@@ -1,4 +1,4 @@
-package main
+package spotify
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"twitchStats/request"
 )
 
 type Search struct {
@@ -179,7 +180,7 @@ func checkAuth() string {
 		req.Header.Set("Authorization", "Basic "+client)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		var ref Refresh
-		err := requestJSON(req, 10, &ref)
+		err := request.JSON(req, 10, &ref)
 		if err != nil {
 			log.Println(err)
 			return ""
@@ -193,7 +194,7 @@ func checkAuth() string {
 	return data.Auth
 }
 
-func searchTrack(name string) (*Search, error) {
+func SearchTrack(name string) (*Search, error) {
 	auth := checkAuth()
 	name = url.QueryEscape(name)
 	url := "https://api.spotify.com/v1/search?query=" + name + "&offset=0&limit=1&type=track"
@@ -201,7 +202,7 @@ func searchTrack(name string) (*Search, error) {
 	req.Header.Set("Authorization", "Bearer "+auth)
 	req.Header.Set("Content-Type", "application/json")
 	var search Search
-	err := requestJSON(req, 10, &search)
+	err := request.JSON(req, 10, &search)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -209,13 +210,13 @@ func searchTrack(name string) (*Search, error) {
 	return &search, nil
 }
 
-func addToPlaylist(uri string) error {
+func AddToPlaylist(uri string) error {
 	auth := checkAuth()
 	url := "https://api.spotify.com/v1/playlists/6U9yUDYW4uN845DUERRiMH/tracks?uris=" + uri
 	req, _ := http.NewRequest("POST", url, nil)
 	req.Header.Set("Authorization", "Bearer "+auth)
 	req.Header.Set("Content-Type", "application/json")
-	err := requestJSON(req, 10, nil)
+	err := request.JSON(req, 10, nil)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -223,13 +224,13 @@ func addToPlaylist(uri string) error {
 	return nil
 }
 
-func getCurrentTrack() (string, error) {
+func GetCurrentTrack() (string, error) {
 	auth := checkAuth()
 	url := "https://api.spotify.com/v1/me/player/currently-playing"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+auth)
 	var curr Current
-	err := requestJSON(req, 10, &curr)
+	err := request.JSON(req, 10, &curr)
 	if err != nil {
 		return "", err
 	}
@@ -240,25 +241,25 @@ func getCurrentTrack() (string, error) {
 	return name + " - " + curr.Item.Name, nil
 }
 
-func skipToNextTrack() {
+func SkipToNextTrack() {
 	auth := checkAuth()
 	url := "https://api.spotify.com/v1/me/player/next"
 	req, _ := http.NewRequest("POST", url, nil)
 	req.Header.Set("Authorization", "Bearer "+auth)
-	err := requestJSON(req, 10, nil)
+	err := request.JSON(req, 10, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 }
 
-func removeTrack(uri string) error {
+func RemoveTrack(uri string) error {
 	auth := checkAuth()
 	url := "https://api.spotify.com/v1/playlists/6U9yUDYW4uN845DUERRiMH//tracks"
 	req, _ := http.NewRequest("DELETE", url, bytes.NewBuffer([]byte("spotify:track:"+uri)))
 	req.Header.Set("Authorization", "Bearer "+auth)
 	req.Header.Set("Content-Type", "application/json")
-	err := requestJSON(req, 10, nil)
+	err := request.JSON(req, 10, nil)
 	if err != nil {
 		fmt.Println(err)
 		return err
