@@ -2,11 +2,7 @@ package main
 
 import (
 	"bufio"
-	"database/sql"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"image"
 	"log"
 	"net/http"
 	"net/url"
@@ -15,6 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"twitchStats/database"
+	"twitchStats/logsparser"
+	"twitchStats/markov"
+	"twitchStats/request"
+	"twitchStats/spotify"
 
 	_ "github.com/mattn/go-sqlite3"
 	//"io/ioutil"
@@ -468,7 +469,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			switch len(args) {
 			case 0:
 				bot.Status = "Running"
-				bot.Utils.Spam.Clear()
+				bot.Spam.Clear()
 				break
 			case 2:
 				var err error
@@ -478,7 +479,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 					break
 				}
 			}
-			bot.Utils.Spam.Add(args[0])
+			bot.Spam.Add(args[0])
 			bot.SpamHistory(args[0], duration)
 			bot.Status = "SpamAttack"
 		case "loadcomments":

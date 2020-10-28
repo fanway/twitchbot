@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+	pb "twitchStats/commands/pb"
+	"twitchStats/database"
+	"twitchStats/logsparser"
+	"twitchStats/request"
+
+	"google.golang.org/grpc"
 )
 
 const (
@@ -30,29 +37,6 @@ const (
 	Server  = "irc.twitch.tv"
 )
 
-type SmartVote struct {
-	Options map[string]int
-	Votes   map[string]string
-}
-
-type Song struct {
-	Username string
-	SongName string
-	Uri      string
-	Duration time.Duration
-}
-
-type RequestedSongs struct {
-	sync.RWMutex
-	Songs []Song
-}
-
-type Utils struct {
-	SmartVote      SmartVote
-	RequestedSongs RequestedSongs
-	Spam           Spam
-}
-
 type Bot struct {
 	Channel     string
 	OAuth       string
@@ -63,8 +47,8 @@ type Bot struct {
 	Status      string
 	Warn        Warn
 	BadWords    map[string]struct{}
-	Commands    map[string]*Command
-	Utils       Utils
+	Spam        Spam
+	GrpcClient  pb.CommandsClient
 }
 
 type Bttv struct {
@@ -114,7 +98,12 @@ func (bot *Bot) Connect() {
 	fmt.Printf("connected to %s\n", bot.Channel)
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	bot.initCommands()
+	opts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}
+	grpcConn, err := grpc.Dial("localhost:3434", opts...)
+	if err != nil {
+		fmt.Println("Unable to connect to grpc")
+	}
+	bot.GrpcClient = pb.NewCommandsClient(grpcConn)
 	go bot.reader(wg)
 	wg.Wait()
 }
@@ -146,7 +135,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 			line, err := tp.ReadLine()
 			if err != nil {
 				log.Println(err)
-				break
+				return
 			}
 			// parsing chat
 			go bot.parseChat(line, logChan)
@@ -159,14 +148,6 @@ type Message struct {
 	Text     string
 	Emotes   string
 	ID       string
-}
-
-func (msg *Message) extractCommand() (string, string) {
-	index := strings.Index(msg.Text, " ")
-	if index == -1 {
-		return msg.Text[1:], ""
-	}
-	return msg.Text[1:index], msg.Text[index+1:]
 }
 
 func (bot *Bot) logsWriter(logChan <-chan Message) {
@@ -314,6 +295,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			if message.Text[0] == '!' {
 				bot.processCommands(&message)
 			}
+		/* FIX ME
 		case "Smartvote":
 			if messageLength == 1 {
 				// check if there is that vote option
@@ -325,14 +307,15 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 					}
 				}
 			}
+		*/
 		case "SpamAttack":
-			bot.Utils.Spam.RLock()
-			for i, _ := range bot.Utils.Spam.Messages {
-				if strings.Contains(message.Text, bot.Utils.Spam.Messages[i]) {
+			bot.Spam.RLock()
+			for i, _ := range bot.Spam.Messages {
+				if strings.Contains(message.Text, bot.Spam.Messages[i]) {
 					bot.ban(message.Username)
 				}
 			}
-			bot.Utils.Spam.RUnlock()
+			bot.Spam.RUnlock()
 		}
 
 	} else if strings.HasPrefix(line, "PING") { // response to keep connection alive
@@ -342,18 +325,31 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 
 // chat commands
 func (bot *Bot) processCommands(message *Message) {
-	var cmd *Command
-	var err error
 	level := bot.Authority[message.Username]
-	cmd, err = bot.parseCommand(message)
+	stream, err := bot.GrpcClient.ParseAndExec(context.Background(), &pb.Message{
+		Channel:  bot.Channel,
+		Username: message.Username,
+		Text:     message.Text,
+		Emotes:   message.Emotes,
+		Id:       message.ID,
+		Level:    int32(level),
+		Status:   bot.Status,
+	})
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	err = cmd.ExecCommand(level)
-	if err != nil {
-		log.Println(err)
-		return
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		bot.Status = in.Status
+		bot.SendMessage(in.Text)
 	}
 }
 

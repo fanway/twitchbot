@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package commands;
+
+option go_package = "twitchstats/commands";
+
+message Message {
+    string channel = 1;
+    string username = 2;
+    string text = 3;
+    string emotes = 4;
+    string id = 5;
+    int32 level = 6;
+    string status = 7;
+}
+
+message ReturnMessage {
+    string text = 1;
+    string status = 2;
+}
+
+service Commands {
+    rpc parseAndExec(Message) returns (stream ReturnMessage) {}
+}
+
