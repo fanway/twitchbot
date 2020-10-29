@@ -41,13 +41,11 @@ type Commands struct {
 	Commands map[string]*Command
 }
 
-func (s *CommandsServer) newCommands() *Commands {
-	// FIX ME
-	logfile, err := os.OpenFile("../funwayz.log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+func (s *CommandsServer) initCommands(channel string) {
+	logfile, err := os.OpenFile("../"+channel+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer logfile.Close()
 	c := &Commands{Utils: Utils{File: logfile}, Commands: map[string]*Command{
 		// !logs username, timeStart, timeEnd
 		"logs": &Command{
@@ -131,7 +129,7 @@ func (s *CommandsServer) newCommands() *Commands {
 			Handler: s.GetLevel,
 		},
 	}}
-	return c
+	s.m[channel] = c
 }
 
 type Utils struct {
@@ -166,6 +164,9 @@ func extractCommand(msg *pb.Message) (string, string) {
 }
 
 func (s *CommandsServer) ParseAndExec(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	if _, ok := s.m[msg.Channel]; !ok {
+		s.initCommands(msg.Channel)
+	}
 	splitIndex := strings.Index(msg.Text, " ")
 	level := int(msg.Level)
 	if splitIndex == -1 {
@@ -595,7 +596,6 @@ func (s *CommandsServer) GetLevel(msg *pb.Message, stream pb.Commands_ParseAndEx
 
 func newServer() *CommandsServer {
 	s := &CommandsServer{m: make(map[string]*Commands)}
-	s.m["#funwayz"] = s.newCommands()
 	return s
 }
 
@@ -607,5 +607,6 @@ func main() {
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterCommandsServer(grpcServer, newServer())
+	fmt.Println("Grpc server started")
 	grpcServer.Serve(lis)
 }
