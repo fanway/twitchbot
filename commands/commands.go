@@ -128,6 +128,12 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   LOW,
 			Handler: s.GetLevel,
 		},
+		"vote": &Command{
+			Name:    "vote",
+			Cd:      0,
+			Level:   LOW,
+			Handler: s.VoteCommand,
+		},
 	}}
 	s.m[channel] = c
 }
@@ -428,6 +434,21 @@ func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_
 		str += fmt.Sprintf(", %s: %.1f%%(%d)", keys[i], percent, s.m[msg.Channel].Utils.SmartVote.Options[keys[i]])
 	}
 	stream.Send(&pb.ReturnMessage{Text: str, Status: msg.Status})
+	return nil
+}
+
+func (s *CommandsServer) VoteCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	if msg.Status != "Smartvote" {
+		return errors.New("Wrong status")
+	}
+	_, body := extractCommand(msg)
+	if _, ok := s.m[msg.Channel].Utils.SmartVote.Options[body]; ok {
+		// consider only the first vote
+		if _, ok := s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username]; !ok {
+			s.m[msg.Channel].Utils.SmartVote.Options[body]++
+			s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username] = body
+		}
+	}
 	return nil
 }
 

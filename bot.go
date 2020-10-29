@@ -295,19 +295,11 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			if message.Text[0] == '!' {
 				bot.processCommands(&message)
 			}
-		/* FIX ME
 		case "Smartvote":
 			if messageLength == 1 {
-				// check if there is that vote option
-				if _, ok := bot.Utils.SmartVote.Options[message.Text]; ok {
-					// consider only the first vote
-					if _, ok := bot.Utils.SmartVote.Votes[message.Username]; !ok {
-						bot.Utils.SmartVote.Options[message.Text]++
-						bot.Utils.SmartVote.Votes[message.Username] = message.Text
-					}
-				}
+				message.Text = "!vote " + message.Text
+				bot.processCommands(&message)
 			}
-		*/
 		case "SpamAttack":
 			bot.Spam.RLock()
 			for i, _ := range bot.Spam.Messages {
