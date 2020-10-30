@@ -560,6 +560,13 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 			console.Println(track)
 		case "nexttrack":
 			spotify.SkipToNextTrack()
+		case "changestatus":
+			if len(args) != 1 {
+				console.Println("something went wrong")
+				break
+			}
+			bot := botInstances[console.currentChannel]
+			bot.Status = args[0]
 		}
 	}
 }
