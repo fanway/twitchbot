@@ -298,8 +298,8 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 		case "Smartvote":
 			if messageLength == 1 {
 				message.Text = "!vote " + message.Text
-				bot.processCommands(&message)
 			}
+			bot.processCommands(&message)
 		case "SpamAttack":
 			bot.Spam.RLock()
 			for i, _ := range bot.Spam.Messages {
