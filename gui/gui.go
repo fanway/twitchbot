@@ -134,7 +134,7 @@ func sendVoteOptions() {
 }
 
 func main() {
-	wnd := giu.NewMasterWindow("Vote", 800, 600, 0, nil)
+	wnd := giu.NewMasterWindow("Vote", 820, 260, 0, nil)
 	layout = append(layout, giu.Button("Add", addInputText))
 	layoutProgress = append(layoutProgress, giu.Line(giu.Button("start vote", startVote), giu.Button("stop vote", stopVote)))
 	imgui.StyleColorsDark()
