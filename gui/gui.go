@@ -36,7 +36,8 @@ func addInputText() {
 func addProgressBar() {
 	layoutProgress = layoutProgress[:1]
 	for i := range counter {
-		layoutProgress = append(layoutProgress, giu.ProgressBar(float32(counter[i])/float32(total), -1, 0, strconv.Itoa(counter[i])))
+		fraction := float32(counter[i]) / float32(total)
+		layoutProgress = append(layoutProgress, giu.ProgressBar(fraction, -1, 0, fmt.Sprintf("%d (%0.1f%%)", counter[i], fraction*100)))
 	}
 }
 
