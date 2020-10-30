@@ -95,7 +95,7 @@ func (bot *Bot) Connect() {
 	fmt.Fprintf(bot.Conn, "PASS %s\r\n", bot.OAuth)
 	fmt.Fprintf(bot.Conn, "NICK %s\r\n", BotName)
 	fmt.Fprintf(bot.Conn, "JOIN %s\r\n", bot.Channel)
-	fmt.Printf("connected to %s\n", bot.Channel)
+	console.Println("connected to " + bot.Channel)
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	opts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}

@@ -21,6 +21,8 @@ import (
 	//"io/ioutil"
 )
 
+var console Console
+
 type IdData struct {
 	Data []struct {
 		ID              string `json:"id"`
@@ -64,7 +66,7 @@ type ChatData struct {
 	} `json:"chatters"`
 }
 
-func findPerson(console *Console, name string) {
+func findPerson(name string) {
 	db := database.Connect()
 	defer db.Close()
 	tx, err := db.Begin()
@@ -368,7 +370,7 @@ func getChatFromVods(link string) ([]string, error) {
 	return messages, nil
 }
 
-func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
+func parseCommand(str string, botInstances map[string]*Bot) {
 	commandsChain := strings.Split(str, "|")
 	for _, s := range commandsChain {
 		s = strings.Trim(s, " ")
@@ -398,7 +400,7 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 				}
 				console.Println("")
 			} else {
-				findPerson(console, args[0])
+				findPerson(args[0])
 			}
 		case "asciify":
 			//console.Println(asciify(args))
@@ -572,7 +574,6 @@ func parseCommand(str string, botInstances map[string]*Bot, console *Console) {
 }
 
 func main() {
-	var console Console
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	console.currentChannel = "#"
 	botInstaces := make(map[string]*Bot)
@@ -583,7 +584,7 @@ func main() {
 		args, status := console.processConsole()
 		switch status {
 		case ENTER:
-			parseCommand(args, botInstaces, &console)
+			parseCommand(args, botInstaces)
 		}
 	}
 }
