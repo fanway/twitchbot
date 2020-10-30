@@ -425,7 +425,6 @@ func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_
 	sort.Strings(keys)
 	var str string
 	total := len(s.m[msg.Channel].Utils.SmartVote.Votes)
-	fmt.Println(total)
 	str = fmt.Sprintf("Total votes %d: ", total)
 	percent := float32(s.m[msg.Channel].Utils.SmartVote.Options[keys[0]]) / float32(total) * 100
 	str += fmt.Sprintf("%s: %.1f%%(%d)", keys[0], percent, s.m[msg.Channel].Utils.SmartVote.Options[keys[0]])

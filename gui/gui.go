@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"regexp"
 	"strconv"
+	"time"
 
 	pb "twitchStats/commands/pb"
 
@@ -21,6 +23,8 @@ var (
 	str            []string
 	counter        []int
 	client         pb.CommandsClient
+	quit           chan bool
+	status         bool
 )
 
 func addInputText() {
@@ -29,20 +33,20 @@ func addInputText() {
 	layout = append(layout, giu.InputText(strconv.Itoa(len(str)), 0, &s))
 }
 
+func addProgressBar() {
+	layoutProgress = layoutProgress[:1]
+	for i := range counter {
+		layoutProgress = append(layoutProgress, giu.ProgressBar(float32(counter[i])/float32(total), -1, 0, strconv.Itoa(counter[i])))
+	}
+}
+
 func startVote() {
+	status = true
+	quit = make(chan bool)
 	sendSmartVote()
-	sendVoteOptions()
 }
 
 func loop() {
-	/*
-		l := giu.Layout{
-			giu.Label("Golosovanie"),
-			giu.Label(fmt.Sprintf("%d", counter)),
-			giu.ProgressBar(float32(counter)/float32(total), -1, 0, strconv.Itoa(counter)),
-			giu.ProgressBar(float32(counter2)/float32(total), -1, 0, strconv.Itoa(counter2)),
-		}
-	*/
 	giu.Window("vote", 10, 30, 400, 200, layout)
 	giu.Window("progress", 410, 30, 400, 200, layoutProgress)
 }
@@ -51,7 +55,7 @@ func sendSmartVote() {
 	stream, err := client.ParseAndExec(context.Background(), &pb.Message{
 		Channel:  "#funwayz",
 		Username: "funwayz",
-		Text:     "!smartvote 0-" + strconv.Itoa(len(str)),
+		Text:     "!smartvote 1-" + strconv.Itoa(len(str)),
 		Level:    2,
 	})
 	if err != nil {
@@ -68,6 +72,27 @@ func sendSmartVote() {
 			break
 		}
 		fmt.Println(in.Text)
+		counter = make([]int, len(str))
+		go func() {
+			ticker := time.NewTicker(time.Second * 1)
+			for {
+				select {
+				case <-quit:
+					return
+				default:
+					sendVoteOptions()
+					<-ticker.C
+					addProgressBar()
+				}
+			}
+		}()
+	}
+}
+
+func stopVote() {
+	if status {
+		quit <- true
+		status = false
 	}
 }
 
@@ -92,14 +117,25 @@ func sendVoteOptions() {
 			log.Println(err)
 			break
 		}
-		fmt.Println(in.Text)
+		re := regexp.MustCompile(`(?m)Total votes (\d)|\((\d)\)`)
+		match := re.FindAllStringSubmatch(in.Text, -1)
+		total, err = strconv.Atoi(match[0][1])
+		if err != nil {
+			break
+		}
+		for i := range counter {
+			counter[i], err = strconv.Atoi(match[i+1][2])
+			if err != nil {
+				break
+			}
+		}
 	}
 }
 
 func main() {
 	wnd := giu.NewMasterWindow("Vote", 800, 600, 0, nil)
 	layout = append(layout, giu.Button("Add", addInputText))
-	layoutProgress = append(layoutProgress, giu.Button("start vote", startVote))
+	layoutProgress = append(layoutProgress, giu.Line(giu.Button("start vote", startVote), giu.Button("stop vote", stopVote)))
 	imgui.StyleColorsDark()
 	opts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}
 	grpcConn, err := grpc.Dial("localhost:3434", opts...)
