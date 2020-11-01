@@ -104,6 +104,7 @@ func (bot *Bot) Connect() {
 		fmt.Println("Unable to connect to grpc")
 	}
 	bot.GrpcClient = pb.NewCommandsClient(grpcConn)
+	go bot.checkReminders()
 	go bot.reader(wg)
 	wg.Wait()
 }
@@ -218,6 +219,29 @@ func (bot *Bot) checkMessage(msg *Message) bool {
 		}
 	}
 	return false
+}
+
+func (bot *Bot) checkReminders() {
+	ticker := time.NewTicker(10 * time.Second)
+	for {
+		stream, err := bot.GrpcClient.ParseAndExec(context.Background(), &pb.Message{Channel: bot.Channel, Text: "!fetchreminder", Status: bot.Status, Level: 2})
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		for {
+			in, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			bot.SendMessage(in.Text)
+		}
+		<-ticker.C
+	}
 }
 
 func (bot *Bot) pasteWriter(msg *Message) {

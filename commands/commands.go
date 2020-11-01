@@ -134,14 +134,32 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   LOW,
 			Handler: s.VoteCommand,
 		},
+		"remind": &Command{
+			Name:    "remind",
+			Cd:      5,
+			Level:   MIDDLE,
+			Handler: s.RemindCommand,
+		},
+		"fetchreminder": &Command{
+			Name:    "fetchreminder",
+			Cd:      5,
+			Level:   TOP,
+			Handler: s.FetchReminder,
+		},
 	}}
 	s.m[channel] = c
+}
+
+type Remind struct {
+	sync.Mutex
+	r []string
 }
 
 type Utils struct {
 	SmartVote      SmartVote
 	RequestedSongs RequestedSongs
 	File           *os.File
+	Remind         Remind
 }
 
 type SmartVote struct {
@@ -611,6 +629,51 @@ func (s *CommandsServer) GetLevel(msg *pb.Message, stream pb.Commands_ParseAndEx
 		message = "top"
 	}
 	stream.Send(&pb.ReturnMessage{Text: "@" + msg.Username + " " + "Your level is: " + message, Status: msg.Status})
+	return nil
+}
+
+func (s *CommandsServer) reminder(msg *pb.Message) {
+	retMsg := "@" + msg.Username + " " + msg.Text
+	s.m[msg.Channel].Utils.Remind.Lock()
+	s.m[msg.Channel].Utils.Remind.r = append(s.m[msg.Channel].Utils.Remind.r, retMsg)
+	s.m[msg.Channel].Utils.Remind.Unlock()
+}
+
+func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	_, body := extractCommand(msg)
+	params := strings.Split(body, " ")
+	lengthParams := len(params)
+	if lengthParams == 0 {
+		return errors.New("!remind: not enough params")
+	}
+	t, err := time.ParseDuration(params[0])
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	var remindMessage string
+	if lengthParams == 1 {
+		remindMessage = ""
+	} else {
+		remindMessage = params[1]
+	}
+	msg.Text = remindMessage
+	time.AfterFunc(t, func() { s.reminder(msg) })
+	return nil
+}
+
+func (s *CommandsServer) FetchReminder(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	s.m[msg.Channel].Utils.Remind.Lock()
+	if len(s.m[msg.Channel].Utils.Remind.r) != 0 {
+		for _, r := range s.m[msg.Channel].Utils.Remind.r {
+			err := stream.Send(&pb.ReturnMessage{Text: r, Status: msg.Status})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	s.m[msg.Channel].Utils.Remind.r = s.m[msg.Channel].Utils.Remind.r[:0]
+	s.m[msg.Channel].Utils.Remind.Unlock()
 	return nil
 }
 
