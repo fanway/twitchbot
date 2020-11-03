@@ -25,6 +25,7 @@ var (
 	client         pb.CommandsClient
 	quit           chan bool
 	status         bool
+	channel        string
 )
 
 func addInputText() {
@@ -54,7 +55,7 @@ func loop() {
 
 func sendSmartVote() {
 	stream, err := client.ParseAndExec(context.Background(), &pb.Message{
-		Channel:  "#funwayz",
+		Channel:  channel,
 		Username: "funwayz",
 		Text:     "!smartvote 1-" + strconv.Itoa(len(str)),
 		Level:    2,
@@ -99,7 +100,7 @@ func stopVote() {
 
 func sendVoteOptions() {
 	stream, err := client.ParseAndExec(context.Background(), &pb.Message{
-		Channel:  "#funwayz",
+		Channel:  channel,
 		Username: "funwayz",
 		Text:     "!voteoptions",
 		Level:    2,
@@ -118,7 +119,7 @@ func sendVoteOptions() {
 			log.Println(err)
 			break
 		}
-		re := regexp.MustCompile(`(?m)Total votes (\d)|\((\d)\)`)
+		re := regexp.MustCompile(`Total votes (\d*)|\((\d*)\)`)
 		match := re.FindAllStringSubmatch(in.Text, -1)
 		total, err = strconv.Atoi(match[0][1])
 		if err != nil {
@@ -135,7 +136,7 @@ func sendVoteOptions() {
 
 func main() {
 	wnd := giu.NewMasterWindow("Vote", 820, 260, 0, nil)
-	layout = append(layout, giu.Button("Add", addInputText))
+	layout = append(layout, giu.Line(giu.Button("Add", addInputText), giu.InputText("", 0, &channel)))
 	layoutProgress = append(layoutProgress, giu.Line(giu.Button("start vote", startVote), giu.Button("stop vote", stopVote)))
 	imgui.StyleColorsDark()
 	opts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}
