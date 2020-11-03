@@ -469,11 +469,13 @@ func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_
 	var str string
 	total := len(s.m[msg.Channel].Utils.SmartVote.Votes)
 	str = fmt.Sprintf("Total votes %d: ", total)
-	percent := float32(atomic.LoadInt32(s.m[msg.Channel].Utils.SmartVote.Options[keys[0]])) / float32(total) * 100
-	str += fmt.Sprintf("%s: %.1f%%(%d)", keys[0], percent, s.m[msg.Channel].Utils.SmartVote.Options[keys[0]])
+	value := atomic.LoadInt32(s.m[msg.Channel].Utils.SmartVote.Options[keys[0]])
+	percent := float32(value) / float32(total) * 100
+	str += fmt.Sprintf("%s: %.1f%%(%d)", keys[0], percent, value)
 	for i := 1; i < length; i++ {
-		percent = float32(atomic.LoadInt32(s.m[msg.Channel].Utils.SmartVote.Options[keys[i]])) / float32(total) * 100
-		str += fmt.Sprintf(", %s: %.1f%%(%d)", keys[i], percent, s.m[msg.Channel].Utils.SmartVote.Options[keys[i]])
+		value = atomic.LoadInt32(s.m[msg.Channel].Utils.SmartVote.Options[keys[i]])
+		percent = float32(value) / float32(total) * 100
+		str += fmt.Sprintf(", %s: %.1f%%(%d)", keys[i], percent, value)
 	}
 	stream.Send(&pb.ReturnMessage{Text: str, Status: msg.Status})
 	return nil
