@@ -326,11 +326,11 @@ func (s *CommandsServer) GetUserSongs(msg *pb.Message, stream pb.Commands_ParseA
 		return errors.New("No songs found")
 	}
 
-	retMsg := " Your requested songs: " + songs[0]
+	retMsg := "Your requested songs: " + songs[0]
 	for i := 1; i < len(songs); i++ {
 		retMsg += ", " + songs[i]
 	}
-	stream.Send(&pb.ReturnMessage{Text: "@" + msg.Username + retMsg, Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, retMsg), Status: msg.Status})
 	return nil
 }
 
@@ -343,7 +343,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 	}
 	if len(track.Tracks.Items) == 0 {
 
-		stream.Send(&pb.ReturnMessage{Text: "@" + msg.Username + " track wasn't found", Status: msg.Status})
+		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s track wansn't found", msg.Username), Status: msg.Status})
 		return errors.New("Track wasn't found")
 	}
 
@@ -356,7 +356,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 	s.m[msg.Username].Utils.RequestedSongs.Lock()
 	defer s.m[msg.Username].Utils.RequestedSongs.Unlock()
 	s.m[msg.Username].Utils.RequestedSongs.Songs = append(s.m[msg.Username].Utils.RequestedSongs.Songs, Song{Username: msg.Username, SongName: trackName, Uri: track.Tracks.Items[0].URI, Duration: time.Duration(track.Tracks.Items[0].DurationMs) * time.Millisecond})
-	stream.Send(&pb.ReturnMessage{Text: "@" + msg.Username + " " + trackName + " was added to the playlist", Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s was added to the playlist", msg.Username, trackName), Status: msg.Status})
 	return nil
 }
 
@@ -392,7 +392,7 @@ func (s *CommandsServer) CurrentTrack(msg *pb.Message, stream pb.Commands_ParseA
 		return err
 	}
 	if track != "" {
-		stream.Send(&pb.ReturnMessage{Text: "@" + msg.Username + " " + track, Status: msg.Status})
+		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, track), Status: msg.Status})
 	}
 	return nil
 }
@@ -620,7 +620,7 @@ func (s *CommandsServer) Markov(msg *pb.Message, stream pb.Commands_ParseAndExec
 	if err != nil {
 		return err
 	}
-	stream.Send(&pb.ReturnMessage{Text: "@" + msg.Username + " " + markovMsg, Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, markovMsg), Status: msg.Status})
 	return nil
 }
 
@@ -639,7 +639,7 @@ func (s *CommandsServer) GetCommands(msg *pb.Message, stream pb.Commands_ParseAn
 	for i := 1; i < len(keys); i++ {
 		commands += ", " + keys[i]
 	}
-	stream.Send(&pb.ReturnMessage{Text: "@" + msg.Username + " " + commands, Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, commands), Status: msg.Status})
 	return nil
 }
 
@@ -653,7 +653,7 @@ func (s *CommandsServer) GetLevel(msg *pb.Message, stream pb.Commands_ParseAndEx
 	case 2:
 		message = "top"
 	}
-	stream.Send(&pb.ReturnMessage{Text: "@" + msg.Username + " " + "Your level is: " + message, Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s Your level is: %s", msg.Username, message), Status: msg.Status})
 	return nil
 }
 
