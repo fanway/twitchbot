@@ -586,7 +586,7 @@ func (s *CommandsServer) Asciify(msg *pb.Message, stream pb.Commands_ParseAndExe
 		rewrite = true
 	}
 
-	if len(params) == 0 {
+	if len(params[0]) == 0 {
 		err := errors.New("!asciify: need emote")
 		return err
 	}
@@ -667,8 +667,7 @@ func (s *CommandsServer) reminder(msg *pb.Message) {
 func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	_, body := extractCommand(msg)
 	params := strings.Split(body, " ")
-	lengthParams := len(params)
-	if lengthParams == 0 {
+	if len(params[0]) == 0 {
 		return errors.New("!remind: not enough params")
 	}
 	t, err := time.ParseDuration(params[0])
@@ -677,7 +676,7 @@ func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_Parse
 		return err
 	}
 	var remindMessage string
-	if lengthParams == 1 {
+	if len(params) < 2 {
 		remindMessage = ""
 	} else {
 		remindMessage = params[1]
