@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	pb "twitchStats/commands/pb"
 	"twitchStats/database"
@@ -163,8 +164,8 @@ type Utils struct {
 }
 
 type SmartVote struct {
-	Options map[string]int
-	Votes   map[string]string
+	Options map[string]*int32
+	Votes   map[string]struct{}
 }
 
 type Song struct {
@@ -406,8 +407,8 @@ func (s *CommandsServer) LogsCommand(msg *pb.Message, stream pb.Commands_ParseAn
 
 func (s *CommandsServer) SmartVoteCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	_, params := extractCommand(msg)
-	s.m[msg.Channel].Utils.SmartVote.Options = make(map[string]int)
-	s.m[msg.Channel].Utils.SmartVote.Votes = make(map[string]string)
+	s.m[msg.Channel].Utils.SmartVote.Options = make(map[string]*int32)
+	s.m[msg.Channel].Utils.SmartVote.Votes = make(map[string]struct{})
 	split := strings.Split(params, "-")
 	if len(split) < 2 {
 		return errors.New("!smartvote: not enough args")
@@ -423,7 +424,8 @@ func (s *CommandsServer) SmartVoteCommand(msg *pb.Message, stream pb.Commands_Pa
 	}
 	for i := lowerBound; i <= upperBound; i++ {
 		voteStr := strconv.Itoa(i)
-		s.m[msg.Channel].Utils.SmartVote.Options[voteStr] = 0
+		var value int32
+		s.m[msg.Channel].Utils.SmartVote.Options[voteStr] = &value
 	}
 	stream.Send(&pb.ReturnMessage{Text: str, Status: "SmartVote"})
 	return nil
@@ -444,10 +446,10 @@ func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_
 	var str string
 	total := len(s.m[msg.Channel].Utils.SmartVote.Votes)
 	str = fmt.Sprintf("Total votes %d: ", total)
-	percent := float32(s.m[msg.Channel].Utils.SmartVote.Options[keys[0]]) / float32(total) * 100
+	percent := float32(atomic.LoadInt32(s.m[msg.Channel].Utils.SmartVote.Options[keys[0]])) / float32(total) * 100
 	str += fmt.Sprintf("%s: %.1f%%(%d)", keys[0], percent, s.m[msg.Channel].Utils.SmartVote.Options[keys[0]])
 	for i := 1; i < length; i++ {
-		percent = float32(s.m[msg.Channel].Utils.SmartVote.Options[keys[i]]) / float32(total) * 100
+		percent = float32(atomic.LoadInt32(s.m[msg.Channel].Utils.SmartVote.Options[keys[i]])) / float32(total) * 100
 		str += fmt.Sprintf(", %s: %.1f%%(%d)", keys[i], percent, s.m[msg.Channel].Utils.SmartVote.Options[keys[i]])
 	}
 	stream.Send(&pb.ReturnMessage{Text: str, Status: msg.Status})
@@ -462,8 +464,8 @@ func (s *CommandsServer) VoteCommand(msg *pb.Message, stream pb.Commands_ParseAn
 	if _, ok := s.m[msg.Channel].Utils.SmartVote.Options[body]; ok {
 		// consider only the first vote
 		if _, ok := s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username]; !ok {
-			s.m[msg.Channel].Utils.SmartVote.Options[body]++
-			s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username] = body
+			atomic.AddInt32(s.m[msg.Channel].Utils.SmartVote.Options[body], 1)
+			s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username] = struct{}{}
 		}
 	}
 	return nil
