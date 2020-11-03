@@ -244,6 +244,33 @@ func (bot *Bot) checkReminders() {
 	}
 }
 
+func (bot *Bot) checkAfk(msg *Message) {
+	re := regexp.MustCompile(`@(\w+)`)
+	match := re.FindStringSubmatch(msg.Text)
+	var cmd string
+	if len(match) == 0 {
+		cmd = "!checkafk"
+	} else {
+		cmd = "!checkafk " + match[1]
+	}
+	stream, err := bot.GrpcClient.ParseAndExec(context.Background(), &pb.Message{Channel: bot.Channel, Text: cmd, Username: msg.Username, Status: bot.Status, Level: 2})
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		bot.Status = in.Status
+		bot.SendMessage(in.Text)
+	}
+}
 func (bot *Bot) pasteWriter(msg *Message) {
 	pasteFile, err := os.OpenFile("paste.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
@@ -316,6 +343,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			if bot.checkMessage(&message) {
 				return
 			}
+			bot.checkAfk(&message)
 			if message.Text[0] == '!' {
 				bot.processCommands(&message)
 			}

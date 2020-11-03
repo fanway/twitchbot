@@ -47,7 +47,7 @@ func (s *CommandsServer) initCommands(channel string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c := &Commands{Utils: Utils{File: logfile}, Commands: map[string]*Command{
+	c := &Commands{Utils: Utils{File: logfile, Afk: Afk{Users: make(map[string]*AfkUsers)}}, Commands: map[string]*Command{
 		// !logs username, timeStart, timeEnd
 		"logs": &Command{
 			Name:    "logs",
@@ -147,6 +147,18 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   TOP,
 			Handler: s.FetchReminder,
 		},
+		"afk": &Command{
+			Name:    "afk",
+			Cd:      5,
+			Level:   MIDDLE,
+			Handler: s.AfkCommand,
+		},
+		"checkafk": &Command{
+			Name:    "checkafk",
+			Cd:      5,
+			Level:   TOP,
+			Handler: s.checkAfk,
+		},
 	}}
 	s.m[channel] = c
 }
@@ -161,6 +173,7 @@ type Utils struct {
 	RequestedSongs RequestedSongs
 	File           *os.File
 	Remind         Remind
+	Afk            Afk
 }
 
 type SmartVote struct {
@@ -178,6 +191,16 @@ type Song struct {
 type RequestedSongs struct {
 	sync.RWMutex
 	Songs []Song
+}
+
+type Afk struct {
+	sync.RWMutex
+	Users map[string]*AfkUsers
+}
+
+type AfkUsers struct {
+	Message string
+	Time    time.Time
 }
 
 func extractCommand(msg *pb.Message) (string, string) {
@@ -676,6 +699,42 @@ func (s *CommandsServer) FetchReminder(msg *pb.Message, stream pb.Commands_Parse
 	}
 	s.m[msg.Channel].Utils.Remind.r = s.m[msg.Channel].Utils.Remind.r[:0]
 	s.m[msg.Channel].Utils.Remind.Unlock()
+	return nil
+}
+
+func (s *CommandsServer) checkAfk(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	var retText string
+
+	s.m[msg.Channel].Utils.Afk.RLock()
+	if v, ok := s.m[msg.Channel].Utils.Afk.Users[msg.Username]; ok {
+		s.m[msg.Channel].Utils.Afk.RUnlock()
+		retText = fmt.Sprintf("%s was afk: %s (%s)", msg.Username, v.Message, time.Since(v.Time).Truncate(time.Second))
+		s.m[msg.Channel].Utils.Afk.Lock()
+		delete(s.m[msg.Channel].Utils.Afk.Users, msg.Username)
+		s.m[msg.Channel].Utils.Afk.Unlock()
+		stream.Send(&pb.ReturnMessage{Text: retText, Status: msg.Status})
+		return nil
+	}
+	_, body := extractCommand(msg)
+	if len(body) == 0 {
+		s.m[msg.Channel].Utils.Afk.RUnlock()
+		return errors.New("checkafk: not enough args")
+	}
+	if v, ok := s.m[msg.Channel].Utils.Afk.Users[body]; ok {
+		s.m[msg.Channel].Utils.Afk.RUnlock()
+		retText = fmt.Sprintf("@%s %s is afk: %s. Last seen: %s ago", msg.Username, body, v.Message, time.Since(v.Time).Truncate(time.Second))
+		stream.Send(&pb.ReturnMessage{Text: retText, Status: msg.Status})
+		return nil
+	}
+	s.m[msg.Channel].Utils.Afk.RUnlock()
+	return errors.New("checkafk: username was not found")
+}
+
+func (s *CommandsServer) AfkCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	_, body := extractCommand(msg)
+	s.m[msg.Channel].Utils.Afk.Lock()
+	s.m[msg.Channel].Utils.Afk.Users[msg.Username] = &AfkUsers{body, time.Now()}
+	s.m[msg.Channel].Utils.Afk.Unlock()
 	return nil
 }
 
