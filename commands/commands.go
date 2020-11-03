@@ -719,7 +719,7 @@ func (s *CommandsServer) checkAfk(msg *pb.Message, stream pb.Commands_ParseAndEx
 	_, body := extractCommand(msg)
 	if len(body) == 0 {
 		s.m[msg.Channel].Utils.Afk.RUnlock()
-		return errors.New("checkafk: not enough args")
+		return nil
 	}
 	if v, ok := s.m[msg.Channel].Utils.Afk.Users[body]; ok {
 		s.m[msg.Channel].Utils.Afk.RUnlock()
