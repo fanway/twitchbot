@@ -177,8 +177,9 @@ type Utils struct {
 }
 
 type SmartVote struct {
-	Options map[string]*int32
-	Votes   map[string]struct{}
+	sync.Mutex
+	Options []*int32
+	Votes   map[string]int
 }
 
 type Song struct {
@@ -430,8 +431,6 @@ func (s *CommandsServer) LogsCommand(msg *pb.Message, stream pb.Commands_ParseAn
 
 func (s *CommandsServer) SmartVoteCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	_, params := extractCommand(msg)
-	s.m[msg.Channel].Utils.SmartVote.Options = make(map[string]*int32)
-	s.m[msg.Channel].Utils.SmartVote.Votes = make(map[string]struct{})
 	split := strings.Split(params, "-")
 	if len(split) < 2 {
 		return errors.New("!smartvote: not enough args")
@@ -445,10 +444,11 @@ func (s *CommandsServer) SmartVoteCommand(msg *pb.Message, stream pb.Commands_Pa
 	if err != nil {
 		return err
 	}
+	s.m[msg.Channel].Utils.SmartVote.Options = make([]*int32, upperBound+1)
+	s.m[msg.Channel].Utils.SmartVote.Votes = make(map[string]int)
 	for i := lowerBound; i <= upperBound; i++ {
-		voteStr := strconv.Itoa(i)
 		var value int32
-		s.m[msg.Channel].Utils.SmartVote.Options[voteStr] = &value
+		s.m[msg.Channel].Utils.SmartVote.Options[i] = &value
 	}
 	stream.Send(&pb.ReturnMessage{Text: str, Status: "SmartVote"})
 	return nil
@@ -458,24 +458,23 @@ func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_
 	if msg.Status != "Smartvote" {
 		return errors.New("There is not any vote")
 	}
-	length := len(s.m[msg.Channel].Utils.SmartVote.Options)
-	keys := make([]string, length)
-	i := 0
-	for k := range s.m[msg.Channel].Utils.SmartVote.Options {
-		keys[i] = k
-		i++
+	keys := []int{}
+	for i, v := range s.m[msg.Channel].Utils.SmartVote.Options {
+		if v == nil {
+			continue
+		}
+		keys = append(keys, i)
 	}
-	sort.Strings(keys)
 	var str string
 	total := len(s.m[msg.Channel].Utils.SmartVote.Votes)
 	str = fmt.Sprintf("Total votes %d: ", total)
 	value := atomic.LoadInt32(s.m[msg.Channel].Utils.SmartVote.Options[keys[0]])
 	percent := float32(value) / float32(total) * 100
-	str += fmt.Sprintf("%s: %.1f%%(%d)", keys[0], percent, value)
-	for i := 1; i < length; i++ {
+	str += fmt.Sprintf("%d: %.1f%%(%d)", keys[0], percent, value)
+	for i := 1; i < len(keys); i++ {
 		value = atomic.LoadInt32(s.m[msg.Channel].Utils.SmartVote.Options[keys[i]])
 		percent = float32(value) / float32(total) * 100
-		str += fmt.Sprintf(", %s: %.1f%%(%d)", keys[i], percent, value)
+		str += fmt.Sprintf(", %d: %.1f%%(%d)", keys[i], percent, value)
 	}
 	stream.Send(&pb.ReturnMessage{Text: str, Status: msg.Status})
 	return nil
@@ -486,13 +485,23 @@ func (s *CommandsServer) VoteCommand(msg *pb.Message, stream pb.Commands_ParseAn
 		return errors.New("Wrong status")
 	}
 	_, body := extractCommand(msg)
-	if _, ok := s.m[msg.Channel].Utils.SmartVote.Options[body]; ok {
-		// consider only the first vote
-		if _, ok := s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username]; !ok {
-			atomic.AddInt32(s.m[msg.Channel].Utils.SmartVote.Options[body], 1)
-			s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username] = struct{}{}
-		}
+	vote, err := strconv.Atoi(body)
+	if err != nil {
+		return err
 	}
+	fmt.Println(vote)
+	if vote < 0 || vote >= len(s.m[msg.Channel].Utils.SmartVote.Options) ||
+		s.m[msg.Channel].Utils.SmartVote.Options[vote] == nil {
+		return errors.New("!vote: out of bounds")
+	}
+	// consider only one vote
+	atomic.AddInt32(s.m[msg.Channel].Utils.SmartVote.Options[vote], 1)
+	s.m[msg.Channel].Utils.SmartVote.Lock()
+	if v, ok := s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username]; ok {
+		atomic.AddInt32(s.m[msg.Channel].Utils.SmartVote.Options[v], -1)
+	}
+	s.m[msg.Channel].Utils.SmartVote.Votes[msg.Username] = vote
+	s.m[msg.Channel].Utils.SmartVote.Unlock()
 	return nil
 }
 

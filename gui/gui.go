@@ -55,10 +55,9 @@ func loop() {
 
 func sendSmartVote() {
 	stream, err := client.ParseAndExec(context.Background(), &pb.Message{
-		Channel:  channel,
-		Username: "funwayz",
-		Text:     "!smartvote 1-" + strconv.Itoa(len(str)),
-		Level:    2,
+		Channel: channel,
+		Text:    "!smartvote 1-" + strconv.Itoa(len(str)),
+		Level:   2,
 	})
 	if err != nil {
 		log.Println(err)
@@ -76,13 +75,14 @@ func sendSmartVote() {
 		fmt.Println(in.Text)
 		counter = make([]int, len(str))
 		go func() {
-			ticker := time.NewTicker(time.Second * 1)
+			ticker := time.NewTicker(time.Millisecond * 100)
 			for {
 				select {
 				case <-quit:
 					return
 				default:
 					sendVoteOptions()
+					giu.Update()
 					<-ticker.C
 					addProgressBar()
 				}
@@ -100,11 +100,10 @@ func stopVote() {
 
 func sendVoteOptions() {
 	stream, err := client.ParseAndExec(context.Background(), &pb.Message{
-		Channel:  channel,
-		Username: "funwayz",
-		Text:     "!voteoptions",
-		Level:    2,
-		Status:   "Smartvote",
+		Channel: channel,
+		Text:    "!voteoptions",
+		Level:   2,
+		Status:  "Smartvote",
 	})
 	if err != nil {
 		log.Println(err)
