@@ -95,10 +95,9 @@ func (bot *Bot) Connect() {
 	fmt.Fprintf(bot.Conn, "PASS %s\r\n", bot.OAuth)
 	fmt.Fprintf(bot.Conn, "NICK %s\r\n", BotName)
 	fmt.Fprintf(bot.Conn, "JOIN %s\r\n", bot.Channel)
-	console.Println("connected to " + bot.Channel)
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	opts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}
+	opts := []grpc.DialOption{grpc.WithInsecure()}
 	grpcConn, err := grpc.Dial("localhost:3434", opts...)
 	if err != nil {
 		fmt.Println("Unable to connect to grpc")
@@ -106,6 +105,7 @@ func (bot *Bot) Connect() {
 	bot.GrpcClient = pb.NewCommandsClient(grpcConn)
 	go bot.checkReminders()
 	go bot.reader(wg)
+	console.Println("connected to " + bot.Channel)
 	wg.Wait()
 }
 
