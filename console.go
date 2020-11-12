@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"golang.org/x/sys/unix"
@@ -137,11 +138,11 @@ func interactiveSort() {
 				var err error
 				comments, err = getChatFromVods(args[1])
 				if err != nil {
-					log.Println(err)
+					console.Log(err)
 				}
 			case "clearcomments":
 				if comments == nil {
-					log.Println("Load some comments")
+					console.Log("Load some comments")
 					continue
 				}
 				comments = nil
@@ -199,6 +200,26 @@ func (console *Console) Println(a ...interface{}) {
 	fmt.Println()
 	console.cursorW = 0
 	console.renderer.render(string(console.state), console.arrowState)
+}
+
+func (console *Console) Log(a ...interface{}) {
+	_, file, line, ok := runtime.Caller(2)
+	if !ok {
+		file = "???"
+		line = 0
+	}
+	shortFile := file
+	for i := len(file) - 1; i > 0; i-- {
+		if file[i] == '/' {
+			shortFile = file[i+1:]
+			break
+		}
+	}
+	time := time.Now().Format("2006-01-02 15:04:05 -0700 MST")
+	var s []interface{}
+	s = append(s, fmt.Sprintf("[%s] %s:%d: ", time, shortFile, line))
+	s = append(s, a...)
+	console.Println(s...)
 }
 
 func (console *Console) clearState() {

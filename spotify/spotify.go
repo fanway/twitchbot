@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -168,7 +167,6 @@ func checkAuth() string {
 	var data Auth
 	err := json.Unmarshal(file, &data)
 	if err != nil {
-		log.Println(err)
 		return ""
 	}
 	client := base64.StdEncoding.EncodeToString([]byte(data.ClientId + ":" + data.ClientSecret))
@@ -182,7 +180,6 @@ func checkAuth() string {
 		var ref Refresh
 		err := request.JSON(req, 10, &ref)
 		if err != nil {
-			log.Println(err)
 			return ""
 		}
 		data.Auth = ref.AccessToken
@@ -204,7 +201,6 @@ func SearchTrack(name string) (*Search, error) {
 	var search Search
 	err := request.JSON(req, 10, &search)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 	return &search, nil

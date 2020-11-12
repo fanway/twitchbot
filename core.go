@@ -71,7 +71,7 @@ func findPerson(name string) {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 		return
 	}
 	defer tx.Rollback()
@@ -86,7 +86,7 @@ func findPerson(name string) {
 		var iddata IdData
 		err := request.JSON(req, 10, &iddata)
 		if err != nil {
-			log.Println(err)
+			console.Log(err)
 			return
 		}
 		id = iddata.Data[0].ID
@@ -95,7 +95,7 @@ func findPerson(name string) {
 	var followers Followers
 	err = request.JSON(req, 10, &followers)
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 		return
 	}
 	cursor := followers.Pagination.Cursor
@@ -104,7 +104,7 @@ func findPerson(name string) {
 		var temp Followers
 		err = request.JSON(req, 10, &temp)
 		if err != nil {
-			log.Println(err)
+			console.Log(err)
 			return
 		}
 		followers.Data = append(followers.Data, temp.Data...)
@@ -114,14 +114,14 @@ func findPerson(name string) {
 	_, err = tx.Exec("CREATE TEMPORARY TABLE Follow(Id INTEGER PRIMARY KEY, FromId TEXT, FromName TEXT, ToId TEXT, ToName TEXT, FollowedAt TEXT);")
 
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 
 	tx.Exec("UPDATE Followers SET FromName=$1 WHERE FromId=$2", followers.Data[0].FromName, id)
 	for _, d := range followers.Data {
 		_, err := tx.Exec("INSERT INTO temp.Follow(FromId, FromName, ToId, ToName, FollowedAt) values($1, $2, $3, $4, $5);", d.FromID, d.FromName, d.ToID, d.ToName, d.FollowedAt)
 		if err != nil {
-			log.Println(err)
+			console.Log(err)
 		}
 	}
 
@@ -133,7 +133,7 @@ func findPerson(name string) {
 	var chatData ChatData
 	err = request.JSON(req, 10, &chatData)
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 	online := false
 
@@ -148,7 +148,7 @@ func findPerson(name string) {
 	console.Println("-----------------------")
 
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 	console.Println("New channels: ")
 	for rows.Next() {
@@ -160,12 +160,12 @@ func findPerson(name string) {
 		var followersAt string
 		err = rows.Scan(&idx, &fromId, &fromName, &toId, &toName, &followersAt)
 		if err != nil {
-			log.Println(err)
+			console.Log(err)
 		}
 		console.Print(toName + " ")
 		_, err = tx.Exec("INSERT INTO Followers(FromId, FromName, ToId, ToName, FollowedAt) values($1, $2, $3, $4, $5);", fromId, fromName, toId, toName, followersAt)
 		if err != nil {
-			log.Println(err)
+			console.Log(err)
 		}
 	}
 	console.Println("")
@@ -174,7 +174,7 @@ func findPerson(name string) {
 
 	defer rows.Close()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 
 	console.Println("Unfollowed channels: ")
@@ -183,12 +183,12 @@ func findPerson(name string) {
 		var toName string
 		err := rows.Scan(&idx, &toName)
 		if err != nil {
-			log.Println(err)
+			console.Log(err)
 		}
 		console.Print(toName + " ")
 		_, err = tx.Exec("DELETE FROM Followers WHERE id=$1", strconv.Itoa(idx))
 		if err != nil {
-			log.Println(err)
+			console.Log(err)
 		}
 	}
 	console.Println("")
@@ -196,7 +196,7 @@ func findPerson(name string) {
 	rows, err = tx.Query("SELECT ToName FROM Followers WHERE FromId=$1;", id)
 	defer rows.Close()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 	//if !online {
 	//	console.Println("-----------------------")
@@ -243,13 +243,13 @@ func personsList(prefix string) []string {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 	defer tx.Rollback()
 	rows, err := tx.Query("SELECT DISTINCT FromName FROM Followers WHERE FromName LIKE $1;", prefix)
 	defer rows.Close()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 	var buffer []string
 	for rows.Next() {
@@ -456,12 +456,12 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			botInstances[console.currentChannel].SendMessage(str)
 		case "markov":
 			if len(args) != 1 {
-				log.Println("something went wrong")
+				console.Log("something went wrong")
 				break
 			}
 			msg, err := markov.Markov(args[0])
 			if err != nil {
-				log.Println(err)
+				console.Log(err)
 				break
 			}
 			console.Println(msg)
@@ -477,7 +477,7 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 				var err error
 				duration, err = time.ParseDuration(args[1])
 				if err != nil {
-					log.Println(err)
+					console.Log(err)
 					break
 				}
 			}
@@ -492,7 +492,7 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			var err error
 			console.comments, err = getChatFromVods(args[0])
 			if err != nil {
-				log.Println(err)
+				console.Log(err)
 			}
 		case "sortcomments":
 			if console.comments == nil {
@@ -509,7 +509,7 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 				var err error
 				timeStart, timeEnd, err = logsparser.ParseTime(commentsArgs[1], commentsArgs[2])
 				if err != nil {
-					log.Println(err)
+					console.Log(err)
 					break
 				}
 			} else {
@@ -532,7 +532,7 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			}
 			file, err := os.OpenFile("vod.log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 			if err != nil {
-				log.Println(err)
+				console.Log(err)
 				break
 			}
 			w := bufio.NewWriter(file)
@@ -556,7 +556,7 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 		case "currenttrack":
 			track, err := spotify.GetCurrentTrack()
 			if err != nil {
-				log.Println(err)
+				console.Log(err)
 				break
 			}
 			console.Println(track)

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"image"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -40,7 +39,7 @@ func Asciify(url string, width int, reverse bool, thMult float32) (string, error
 	defer res.Body.Close()
 	img, _, err := image.Decode(res.Body)
 	if err != nil {
-		log.Println(err)
+		return "", err
 	}
 	return asciify.Braille(img, width, reverse, thMult), nil
 }

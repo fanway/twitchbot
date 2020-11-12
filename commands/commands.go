@@ -224,7 +224,7 @@ func (s *CommandsServer) ParseAndExec(msg *pb.Message, stream pb.Commands_ParseA
 	if cmd, ok := s.m[msg.Channel].Commands[msg.Text[1:splitIndex]]; ok {
 		err := cmd.Cooldown(level)
 		if err != nil {
-			log.Println(err)
+			console.Log(err)
 			return err
 		}
 		if level >= cmd.Level {
@@ -277,7 +277,7 @@ func (s *CommandsServer) StopVoteCommand(msg *pb.Message, stream pb.Commands_Par
 func (req *RequestedSongs) clear() (int, error) {
 	track, err := spotify.GetCurrentTrack()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 		return 0, err
 	}
 	req.Lock()
@@ -339,7 +339,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 	_, params := extractCommand(msg)
 	track, err := spotify.SearchTrack(params)
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 		return err
 	}
 	if len(track.Tracks.Items) == 0 {
@@ -350,7 +350,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 
 	err = spotify.AddToPlaylist(track.Tracks.Items[0].URI)
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 		return err
 	}
 	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
@@ -389,7 +389,7 @@ func (s *CommandsServer) RemoveRequestedTrack(msg *pb.Message, stream pb.Command
 func (s *CommandsServer) CurrentTrack(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	track, err := spotify.GetCurrentTrack()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 		return err
 	}
 	if track != "" {
@@ -489,7 +489,6 @@ func (s *CommandsServer) VoteCommand(msg *pb.Message, stream pb.Commands_ParseAn
 	if err != nil {
 		return err
 	}
-	fmt.Println(vote)
 	if vote < 0 || vote >= len(s.m[msg.Channel].Utils.SmartVote.Options) ||
 		s.m[msg.Channel].Utils.SmartVote.Options[vote] == nil {
 		return errors.New("!vote: out of bounds")
@@ -511,7 +510,7 @@ func FfzBttv(emote string) (string, error) {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 	defer tx.Rollback()
 
@@ -560,7 +559,7 @@ func addEmote(url, code string) error {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 	}
 	defer tx.Rollback()
 	_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", url, code)
@@ -683,7 +682,7 @@ func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_Parse
 	}
 	t, err := time.ParseDuration(params[0])
 	if err != nil {
-		log.Println(err)
+		console.Log(err)
 		return err
 	}
 	var remindMessage string
