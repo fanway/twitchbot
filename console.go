@@ -171,7 +171,7 @@ func (console *Console) Print(a ...interface{}) {
 	}
 	for i, _ := range a {
 		if i > 0 {
-			fmt.Print(' ')
+			fmt.Print(" ")
 			console.cursorW += 1
 		}
 		fmt.Print(a[i])
@@ -192,7 +192,7 @@ func (console *Console) Println(a ...interface{}) {
 	}
 	for i, _ := range a {
 		if i > 0 {
-			fmt.Print(' ')
+			fmt.Print(" ")
 		}
 		fmt.Print(a[i])
 	}
