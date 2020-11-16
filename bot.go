@@ -21,6 +21,7 @@ import (
 	"twitchStats/database"
 	"twitchStats/logsparser"
 	"twitchStats/request"
+	"twitchStats/terminal"
 
 	"google.golang.org/grpc"
 )
@@ -105,7 +106,7 @@ func (bot *Bot) Connect() {
 	bot.GrpcClient = pb.NewCommandsClient(grpcConn)
 	go bot.checkReminders()
 	go bot.reader(wg)
-	console.Println("connected to " + bot.Channel)
+	terminal.Output.Println("connected to " + bot.Channel)
 	wg.Wait()
 }
 
@@ -135,7 +136,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 		default:
 			line, err := tp.ReadLine()
 			if err != nil {
-				console.Log(err)
+				terminal.Output.Log(err)
 				return
 			}
 			// parsing chat
@@ -226,7 +227,7 @@ func (bot *Bot) checkReminders() {
 	for {
 		stream, err := bot.GrpcClient.ParseAndExec(context.Background(), &pb.Message{Channel: bot.Channel, Text: "!fetchreminder", Status: bot.Status, Level: 2})
 		if err != nil {
-			console.Log(err)
+			terminal.Output.Log(err)
 			return
 		}
 		for {
@@ -235,7 +236,7 @@ func (bot *Bot) checkReminders() {
 				break
 			}
 			if err != nil {
-				console.Log(err)
+				terminal.Output.Log(err)
 				break
 			}
 			bot.SendMessage(in.Text)
@@ -255,7 +256,7 @@ func (bot *Bot) checkAfk(msg *Message) {
 	}
 	stream, err := bot.GrpcClient.ParseAndExec(context.Background(), &pb.Message{Channel: bot.Channel, Text: cmd, Username: msg.Username, Status: bot.Status, Level: 2})
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return
 	}
 	for {
@@ -264,7 +265,7 @@ func (bot *Bot) checkAfk(msg *Message) {
 			break
 		}
 		if err != nil {
-			console.Log(err)
+			terminal.Output.Log(err)
 			break
 		}
 		bot.Status = in.Status
@@ -274,13 +275,13 @@ func (bot *Bot) checkAfk(msg *Message) {
 func (bot *Bot) pasteWriter(msg *Message) {
 	pasteFile, err := os.OpenFile("paste.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	defer pasteFile.Close()
 	pasteWriter := bufio.NewWriter(pasteFile)
 	_, err = fmt.Fprintf(pasteWriter, "%s\n\n", msg.Text)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	pasteWriter.Flush()
 }
@@ -350,8 +351,8 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 		case "Smartvote":
 			if messageLength == 1 {
 				message.Text = "!vote " + message.Text
+				bot.processCommands(&message)
 			}
-			bot.processCommands(&message)
 		case "SpamAttack":
 			bot.Spam.RLock()
 			for i, _ := range bot.Spam.Messages {
@@ -380,7 +381,7 @@ func (bot *Bot) processCommands(message *Message) {
 		Status:   bot.Status,
 	})
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return
 	}
 	for {
@@ -389,7 +390,7 @@ func (bot *Bot) processCommands(message *Message) {
 			break
 		}
 		if err != nil {
-			console.Log(err)
+			terminal.Output.Log(err)
 			break
 		}
 		bot.Status = in.Status
@@ -400,11 +401,11 @@ func (bot *Bot) processCommands(message *Message) {
 func initBadWords() map[string]struct{} {
 	file, err := ioutil.ReadFile("badwords.txt")
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	var m map[string]struct{}
 	if err = json.Unmarshal(file, &m); err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	return m
 }
@@ -412,11 +413,11 @@ func initBadWords() map[string]struct{} {
 func initAuthority() map[string]int {
 	file, err := ioutil.ReadFile("authority.txt")
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	var m map[string]string
 	if err = json.Unmarshal(file, &m); err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	mp := make(map[string]int)
 	for k := range m {
@@ -435,21 +436,21 @@ func initAuthority() map[string]int {
 func (bot *Bot) changeAuthority(username, level string) {
 	file, err := ioutil.ReadFile("authority.txt")
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	var m map[string]string
 	if err = json.Unmarshal(file, &m); err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	m[username] = level
 	newAuthority, err := json.Marshal(m)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return
 	}
 	err = ioutil.WriteFile("authority.txt", newAuthority, 0644)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return
 	}
 	bot.Authority = initAuthority()
@@ -460,20 +461,20 @@ func (bot *Bot) updateEmotes() {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	defer tx.Rollback()
 
 	_, err = tx.Exec("CREATE TABLE IF NOT EXISTS ffzbttv(url TEXT NOT NULL, code TEXT NOT NULL, UNIQUE (url) ON CONFLICT REPLACE);")
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	ffzUrl := "https://api.frankerfacez.com/v1/room/" + bot.Channel[1:]
 	var ffz map[string]interface{}
 	req, _ := http.NewRequest("GET", ffzUrl, nil)
 	err = request.JSON(req, 10, &ffz)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return
 	}
 	room := ffz["room"].(map[string]interface{})
@@ -494,7 +495,7 @@ func (bot *Bot) updateEmotes() {
 		}
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", "https:"+s, name)
 		if err != nil {
-			console.Log(err)
+			terminal.Output.Log(err)
 		}
 	}
 
@@ -503,19 +504,19 @@ func (bot *Bot) updateEmotes() {
 	req, _ = http.NewRequest("GET", bttvUrl, nil)
 	err = request.JSON(req, 10, &bttv)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	cdnUrl := "https://cdn.betterttv.net/emote/"
 	for _, u := range bttv.SharedEmotes {
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
 		if err != nil {
-			console.Log(err)
+			terminal.Output.Log(err)
 		}
 	}
 	for _, u := range bttv.ChannelEmotes {
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", cdnUrl+u.ID+"/3x", u.Code)
 		if err != nil {
-			console.Log(err)
+			terminal.Output.Log(err)
 		}
 	}
 
@@ -525,12 +526,12 @@ func (bot *Bot) updateEmotes() {
 	var tempTwitch map[string]json.RawMessage
 	err = request.JSON(req, 10, &tempTwitch)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return
 	}
 	var twitch TwitchEmotes
 	if err := json.Unmarshal(tempTwitch["emoticons"], &twitch); err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return
 	}
 
@@ -538,7 +539,7 @@ func (bot *Bot) updateEmotes() {
 		url := strings.Replace(v.URL, "/1.0", "/3.0", 1)
 		_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", url, v.Regex)
 		if err != nil {
-			console.Log(err)
+			terminal.Output.Log(err)
 		}
 	}
 

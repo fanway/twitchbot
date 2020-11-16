@@ -21,6 +21,7 @@ import (
 	"twitchStats/markov"
 	"twitchStats/request"
 	"twitchStats/spotify"
+	"twitchStats/terminal"
 
 	"google.golang.org/grpc"
 )
@@ -224,7 +225,7 @@ func (s *CommandsServer) ParseAndExec(msg *pb.Message, stream pb.Commands_ParseA
 	if cmd, ok := s.m[msg.Channel].Commands[msg.Text[1:splitIndex]]; ok {
 		err := cmd.Cooldown(level)
 		if err != nil {
-			console.Log(err)
+			terminal.Output.Log(err)
 			return err
 		}
 		if level >= cmd.Level {
@@ -277,7 +278,7 @@ func (s *CommandsServer) StopVoteCommand(msg *pb.Message, stream pb.Commands_Par
 func (req *RequestedSongs) clear() (int, error) {
 	track, err := spotify.GetCurrentTrack()
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return 0, err
 	}
 	req.Lock()
@@ -339,7 +340,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 	_, params := extractCommand(msg)
 	track, err := spotify.SearchTrack(params)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return err
 	}
 	if len(track.Tracks.Items) == 0 {
@@ -350,7 +351,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 
 	err = spotify.AddToPlaylist(track.Tracks.Items[0].URI)
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return err
 	}
 	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
@@ -389,7 +390,7 @@ func (s *CommandsServer) RemoveRequestedTrack(msg *pb.Message, stream pb.Command
 func (s *CommandsServer) CurrentTrack(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	track, err := spotify.GetCurrentTrack()
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return err
 	}
 	if track != "" {
@@ -510,7 +511,7 @@ func FfzBttv(emote string) (string, error) {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	defer tx.Rollback()
 
@@ -559,7 +560,7 @@ func addEmote(url, code string) error {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 	}
 	defer tx.Rollback()
 	_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", url, code)
@@ -682,7 +683,7 @@ func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_Parse
 	}
 	t, err := time.ParseDuration(params[0])
 	if err != nil {
-		console.Log(err)
+		terminal.Output.Log(err)
 		return err
 	}
 	var remindMessage string

@@ -1,16 +1,18 @@
-package main
+package terminal
 
 import (
 	"fmt"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
+	"twitchStats/buffer"
 	"unicode"
 
 	"golang.org/x/sys/unix"
 )
+
+var Output Console
 
 const (
 	TAB         = 9
@@ -30,7 +32,7 @@ func abs(x int) int {
 	return x
 }
 
-func getChar(f *os.File) ([]byte, int) {
+func GetChar(f *os.File) ([]byte, int) {
 	bs := make([]byte, 16, 16)
 	n, err := f.Read(bs)
 	if err != nil {
@@ -39,7 +41,7 @@ func getChar(f *os.File) ([]byte, int) {
 	return bs, n
 }
 
-func setTerm() {
+func SetTerm() {
 	raw, err := unix.IoctlGetTermios(int(os.Stdin.Fd()), unix.TIOCGETA)
 	if err != nil {
 		//panic(err)
@@ -52,7 +54,7 @@ func setTerm() {
 	}
 }
 
-func processTab(state string, buffer *Buffer) string {
+func ProcessTab(state string, buffer *buffer.Buffer) string {
 	state = strings.Trim(state, " ")
 	args := strings.Split(state, " ")
 
@@ -68,7 +70,7 @@ func processTab(state string, buffer *Buffer) string {
 	switch command {
 	case "find":
 		if buffer.Empty() {
-			buffer.Append(personsList(prefix))
+			buffer.Append(PersonsList(prefix))
 			if buffer.Empty() {
 				buffer.Add(args[0])
 			}
@@ -79,13 +81,13 @@ func processTab(state string, buffer *Buffer) string {
 	}
 }
 
-func createPrefixBuffer(state string, commandsBuffer *Buffer) Buffer {
-	var prefixBuffer Buffer
+func createPrefixBuffer(state string, commandsBuffer *buffer.Buffer) buffer.Buffer {
+	var prefixBuffer buffer.Buffer
 	prefixMap := make(map[string]int)
-	for _, s := range commandsBuffer.buffer {
+	for _, s := range commandsBuffer.Buffer {
 		prefixMap[s]++
 	}
-	for _, s := range commandsBuffer.buffer {
+	for _, s := range commandsBuffer.Buffer {
 		prefixMap[s]--
 		if state == "" || strings.HasPrefix(s, state) && prefixMap[s] == 0 {
 			prefixBuffer.Add(s)
@@ -114,18 +116,18 @@ func (r InteractiveRenderer) render(state string, arrowState string) {
 }
 
 type CoreRenderer struct {
-	currentChannel *string
+	CurrentChannel *string
 }
 
 func (r CoreRenderer) render(state string, arrowState string) {
-	fmt.Print("\033[2K\r" + "[" + *r.currentChannel + "]> " + state + arrowState)
+	fmt.Print("\033[2K\r" + "[" + *r.CurrentChannel + "]> " + state + arrowState)
 }
 
-func interactiveSort() {
+func InteractiveSort() {
 	var comments []string
-	console := Console{renderer: InteractiveRenderer{comments: &comments}}
+	console := Console{Renderer: InteractiveRenderer{comments: &comments}}
 	for {
-		state, code := console.processConsole()
+		state, code := console.ProcessConsole()
 		if code == ENTER {
 			args := strings.Split(state, " ")
 			switch args[0] {
@@ -136,7 +138,7 @@ func interactiveSort() {
 					continue
 				}
 				var err error
-				comments, err = getChatFromVods(args[1])
+				comments, err = GetChatFromVods(args[1])
 				if err != nil {
 					console.Log(err)
 				}
@@ -152,10 +154,10 @@ func interactiveSort() {
 }
 
 type Console struct {
-	commandsBuffer Buffer
-	currentChannel string
-	comments       []string
-	renderer       Renderer
+	CommandsBuffer buffer.Buffer
+	CurrentChannel string
+	Comments       []string
+	Renderer       Renderer
 	state          []rune
 	arrowState     string
 	cursorW        int
@@ -165,7 +167,7 @@ func (console *Console) Print(a ...interface{}) {
 	fmt.Print("\033[2K\r")
 	if console.cursorW != 0 {
 		fmt.Print("\033[2F")
-		fmt.Print("\033[" + strconv.Itoa(console.cursorW) + "C")
+		fmt.Printf("\033[%dC", console.cursorW)
 	} else {
 		fmt.Print("\033[1F")
 	}
@@ -179,14 +181,14 @@ func (console *Console) Print(a ...interface{}) {
 	}
 	fmt.Println()
 	fmt.Println()
-	console.renderer.render(string(console.state), console.arrowState)
+	console.Renderer.render(string(console.state), console.arrowState)
 }
 
 func (console *Console) Println(a ...interface{}) {
 	fmt.Print("\033[2K\r")
 	if console.cursorW != 0 {
 		fmt.Print("\033[2F")
-		fmt.Print("\033[" + strconv.Itoa(console.cursorW) + "C")
+		fmt.Printf("\033[%dC", console.cursorW)
 	} else {
 		fmt.Print("\033[1F")
 	}
@@ -199,7 +201,7 @@ func (console *Console) Println(a ...interface{}) {
 	fmt.Println()
 	fmt.Println()
 	console.cursorW = 0
-	console.renderer.render(string(console.state), console.arrowState)
+	console.Renderer.render(string(console.state), console.arrowState)
 }
 
 func (console *Console) Log(a ...interface{}) {
@@ -228,17 +230,17 @@ func (console *Console) clearState() {
 	console.cursorW = 0
 }
 
-func (console *Console) processConsole() (string, int) {
-	var tabBuffer Buffer
-	var prefixBuffer Buffer
+func (console *Console) ProcessConsole() (string, int) {
+	var tabBuffer buffer.Buffer
+	var prefixBuffer buffer.Buffer
 	var arrowPointer int
 	var lenState int
 	for {
 		// \033[H
 		lenState = len(console.state)
 		strState := string(console.state)
-		console.renderer.render(strState, console.arrowState)
-		bytes, numOfBytes := getChar(os.Stdin)
+		console.Renderer.render(strState, console.arrowState)
+		bytes, numOfBytes := GetChar(os.Stdin)
 		ch := []rune(string(bytes[:numOfBytes]))
 		switch ch[0] {
 		case BACKSPACE:
@@ -256,10 +258,10 @@ func (console *Console) processConsole() (string, int) {
 			tabBuffer.Clear()
 			prefixBuffer.Clear()
 		case ENTER:
-			if console.commandsBuffer.Empty() || strState != console.commandsBuffer.Back() {
-				console.commandsBuffer.Add(strState)
+			if console.CommandsBuffer.Empty() || strState != console.CommandsBuffer.Back() {
+				console.CommandsBuffer.Add(strState)
 			}
-			console.commandsBuffer.index = console.commandsBuffer.Size()
+			console.CommandsBuffer.Index = console.CommandsBuffer.Size()
 			fmt.Println()
 			fmt.Println()
 			console.clearState()
@@ -294,7 +296,7 @@ func (console *Console) processConsole() (string, int) {
 					break
 				}
 			}
-			console.state = append(console.state[:left], append([]rune(processTab(string(console.state[left:right]), &tabBuffer)), console.state[right:]...)...)
+			console.state = append(console.state[:left], append([]rune(ProcessTab(string(console.state[left:right]), &tabBuffer)), console.state[right:]...)...)
 		case ESC:
 			if numOfBytes != 3 {
 				continue
@@ -302,26 +304,26 @@ func (console *Console) processConsole() (string, int) {
 			if ch[1] == '[' {
 				switch ch[2] {
 				case ARROW_UP:
-					if !console.commandsBuffer.Empty() {
+					if !console.CommandsBuffer.Empty() {
 						if prefixBuffer.Empty() {
-							prefixBuffer = createPrefixBuffer(strState, &console.commandsBuffer)
+							prefixBuffer = createPrefixBuffer(strState, &console.CommandsBuffer)
 						}
 						//up
-						if prefixBuffer.index != 0 {
-							prefixBuffer.index--
+						if prefixBuffer.Index != 0 {
+							prefixBuffer.Index--
 							console.state = []rune(prefixBuffer.Get())
 						}
 					}
 				case ARROW_DOWN:
-					if !console.commandsBuffer.Empty() {
+					if !console.CommandsBuffer.Empty() {
 						if prefixBuffer.Empty() {
-							prefixBuffer = createPrefixBuffer(strState, &console.commandsBuffer)
+							prefixBuffer = createPrefixBuffer(strState, &console.CommandsBuffer)
 						}
 						//down
-						if prefixBuffer.index >= prefixBuffer.Size()-1 {
+						if prefixBuffer.Index >= prefixBuffer.Size()-1 {
 							console.state = []rune(prefixBuffer.Back())
 						} else {
-							prefixBuffer.index++
+							prefixBuffer.Index++
 							console.state = []rune(prefixBuffer.Get())
 						}
 					}
