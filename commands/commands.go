@@ -49,14 +49,14 @@ func (s *CommandsServer) initCommands(channel string) {
 		log.Fatal(err)
 	}
 	c := &Commands{Utils: Utils{File: logfile, Afk: Afk{Users: make(map[string]*AfkUsers)}}, Commands: map[string]*Command{
-		// !logs username, timeStart, timeEnd
+		// !logs <username, timeStart, timeEnd>
 		"logs": &Command{
 			Name:    "logs",
 			Cd:      60,
 			Level:   TOP,
 			Handler: s.LogsCommand,
 		},
-		// !smartvote lowerBound, upperBound
+		// !smartvote <lowerBound, upperBound>
 		"smartvote": &Command{
 			Name:    "smartvote",
 			Cd:      30,
@@ -112,54 +112,63 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   LOW,
 			Handler: s.CurrentTrack,
 		},
+		// !mr
 		"mr": &Command{
 			Name:    "mr",
 			Cd:      10,
 			Level:   LOW,
 			Handler: s.GetUserSongs,
 		},
+		// !commands
 		"commands": &Command{
 			Name:    "commands",
 			Cd:      3,
 			Level:   LOW,
 			Handler: s.GetCommands,
 		},
+		// !level
 		"level": &Command{
 			Name:    "level",
 			Cd:      10,
 			Level:   LOW,
 			Handler: s.GetLevel,
 		},
+		// !vote <option>
 		"vote": &Command{
 			Name:    "vote",
 			Cd:      0,
 			Level:   LOW,
 			Handler: s.VoteCommand,
 		},
+		// !remind <time> <message>
 		"remind": &Command{
 			Name:    "remind",
 			Cd:      5,
 			Level:   MIDDLE,
 			Handler: s.RemindCommand,
 		},
+		// service command
 		"fetchreminder": &Command{
 			Name:    "fetchreminder",
 			Cd:      5,
 			Level:   TOP,
 			Handler: s.FetchReminder,
 		},
+		// !afk <message>
 		"afk": &Command{
 			Name:    "afk",
 			Cd:      5,
 			Level:   MIDDLE,
 			Handler: s.AfkCommand,
 		},
+		// service command
 		"checkafk": &Command{
 			Name:    "checkafk",
 			Cd:      5,
 			Level:   TOP,
 			Handler: s.checkAfk,
 		},
+		// !stalk <username>
 		"stalk": &Command{
 			Name:    "stalk",
 			Cd:      5,
