@@ -160,6 +160,12 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   TOP,
 			Handler: s.checkAfk,
 		},
+		"stalk": &Command{
+			Name:    "stalk",
+			Cd:      5,
+			Level:   MIDDLE,
+			Handler: s.StalkCommand,
+		},
 	}}
 	s.m[channel] = c
 }
@@ -745,6 +751,35 @@ func (s *CommandsServer) AfkCommand(msg *pb.Message, stream pb.Commands_ParseAnd
 	s.m[msg.Channel].Utils.Afk.Lock()
 	s.m[msg.Channel].Utils.Afk.Users[msg.Username] = &AfkUsers{body, time.Now()}
 	s.m[msg.Channel].Utils.Afk.Unlock()
+	return nil
+}
+
+func (s *CommandsServer) StalkCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	_, body := extractCommand(msg)
+	timeNow := time.Now()
+	timeStart := timeNow.Add(-24 * time.Hour)
+	timeEnd := timeNow
+	if _, err := s.m[msg.Channel].Utils.File.Seek(0, io.SeekStart); err != nil {
+		panic(err)
+	}
+	r := bufio.NewScanner(s.m[msg.Channel].Utils.File)
+	retMessage := "Found nothing, sorry! :)"
+	for r.Scan() {
+		str := r.Text()
+		parsedStr, err := logsparser.Parse(str, "", body, timeStart, timeEnd)
+		if err != nil {
+			continue
+		}
+		t, err := time.Parse(logsparser.Layout, parsedStr[1])
+		if err != nil {
+			continue
+		}
+		retMessage = fmt.Sprintf("%s was seen %s ago, last message: %s", body, time.Since(t).Truncate(time.Second), parsedStr[3])
+	}
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, retMessage), Status: msg.Status})
+	if err := r.Err(); err != nil {
+		return err
+	}
 	return nil
 }
 
