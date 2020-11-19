@@ -422,7 +422,7 @@ func (s *CommandsServer) LogsCommand(msg *pb.Message, stream pb.Commands_ParseAn
 		if err != nil {
 			continue
 		}
-		stream.Send(&pb.ReturnMessage{Text: parsedStr, Status: msg.Status})
+		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3]), Status: msg.Status})
 		if err := r.Err(); err != nil {
 			return err
 		}

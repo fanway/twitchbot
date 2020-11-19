@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	_ "net/http/pprof"
 	"os"
@@ -163,11 +164,11 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			}
 			username := commentsArgs[0]
 			for _, comment := range terminal.Output.Comments {
-				str, err := logsparser.Parse(comment, "", username, timeStart, timeEnd)
+				parsedStr, err := logsparser.Parse(comment, "", username, timeStart, timeEnd)
 				if err != nil {
 					continue
 				}
-				terminal.Output.Print(str)
+				terminal.Output.Print(fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3]))
 			}
 		case "interactivesort":
 			terminal.InteractiveSort()
