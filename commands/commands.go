@@ -51,6 +51,7 @@ func (s *CommandsServer) initCommands(channel string) {
 	c := &Commands{Utils: Utils{File: logfile, Afk: Afk{Users: make(map[string]*AfkUsers)}}, Commands: map[string]*Command{
 		// !logs <username, timeStart, timeEnd>
 		"logs": &Command{
+			Enabled: true,
 			Name:    "logs",
 			Cd:      60,
 			Level:   TOP,
@@ -58,6 +59,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !smartvote <lowerBound, upperBound>
 		"smartvote": &Command{
+			Enabled: true,
 			Name:    "smartvote",
 			Cd:      30,
 			Level:   TOP,
@@ -65,6 +67,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !stopvote
 		"stopvote": &Command{
+			Enabled: true,
 			Name:    "stopvote",
 			Cd:      15,
 			Level:   TOP,
@@ -72,6 +75,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !voteoptions
 		"voteoptions": &Command{
+			Enabled: true,
 			Name:    "voteoptions",
 			Cd:      5,
 			Level:   MIDDLE,
@@ -79,6 +83,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !asciify <emote>
 		"asciify": &Command{
+			Enabled: true,
 			Name:    "asciify",
 			Cd:      10,
 			Level:   MIDDLE,
@@ -86,6 +91,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !asciify <emote>
 		"asciify~": &Command{
+			Enabled: true,
 			Name:    "asciify~",
 			Cd:      10,
 			Level:   MIDDLE,
@@ -93,6 +99,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !ш
 		"ш": &Command{
+			Enabled: true,
 			Name:    "ш",
 			Cd:      25,
 			Level:   MIDDLE,
@@ -100,6 +107,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !r <song name>
 		"r": &Command{
+			Enabled: true,
 			Name:    "r",
 			Cd:      0,
 			Level:   LOW,
@@ -107,6 +115,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !song
 		"song": &Command{
+			Enabled: true,
 			Name:    "song",
 			Cd:      10,
 			Level:   LOW,
@@ -114,6 +123,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !mr
 		"mr": &Command{
+			Enabled: true,
 			Name:    "mr",
 			Cd:      10,
 			Level:   LOW,
@@ -121,6 +131,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !commands
 		"commands": &Command{
+			Enabled: true,
 			Name:    "commands",
 			Cd:      3,
 			Level:   LOW,
@@ -128,6 +139,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !level
 		"level": &Command{
+			Enabled: true,
 			Name:    "level",
 			Cd:      10,
 			Level:   LOW,
@@ -135,6 +147,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !vote <option>
 		"vote": &Command{
+			Enabled: true,
 			Name:    "vote",
 			Cd:      0,
 			Level:   LOW,
@@ -142,6 +155,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !remind <time> <message>
 		"remind": &Command{
+			Enabled: true,
 			Name:    "remind",
 			Cd:      5,
 			Level:   MIDDLE,
@@ -149,6 +163,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// service command
 		"fetchreminder": &Command{
+			Enabled: true,
 			Name:    "fetchreminder",
 			Cd:      5,
 			Level:   TOP,
@@ -156,6 +171,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !afk <message>
 		"afk": &Command{
+			Enabled: true,
 			Name:    "afk",
 			Cd:      5,
 			Level:   MIDDLE,
@@ -163,6 +179,7 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// service command
 		"checkafk": &Command{
+			Enabled: true,
 			Name:    "checkafk",
 			Cd:      5,
 			Level:   TOP,
@@ -170,10 +187,27 @@ func (s *CommandsServer) initCommands(channel string) {
 		},
 		// !stalk <username>
 		"stalk": &Command{
+			Enabled: true,
 			Name:    "stalk",
 			Cd:      5,
 			Level:   MIDDLE,
 			Handler: s.StalkCommand,
+		},
+		// !disable <command>
+		"disable": &Command{
+			Enabled: true,
+			Name:    "disable",
+			Cd:      5,
+			Level:   TOP,
+			Handler: s.DisableCommand,
+		},
+		// !enable <command>
+		"enable": &Command{
+			Enabled: true,
+			Name:    "enable",
+			Cd:      5,
+			Level:   TOP,
+			Handler: s.EnableCommand,
 		},
 	}}
 	s.m[channel] = c
@@ -238,6 +272,9 @@ func (s *CommandsServer) ParseAndExec(msg *pb.Message, stream pb.Commands_ParseA
 		splitIndex = len(msg.Text)
 	}
 	if cmd, ok := s.m[msg.Channel].Commands[msg.Text[1:splitIndex]]; ok {
+		if !cmd.Enabled {
+			return errors.New(cmd.Name + " command is disabled")
+		}
 		err := cmd.Cooldown(level)
 		if err != nil {
 			terminal.Output.Log(err)
@@ -256,6 +293,7 @@ func (s *CommandsServer) ParseAndExec(msg *pb.Message, stream pb.Commands_ParseA
 }
 
 type Command struct {
+	Enabled   bool
 	Name      string
 	LastUsage time.Time
 	Cd        int
@@ -438,9 +476,9 @@ func (s *CommandsServer) LogsCommand(msg *pb.Message, stream pb.Commands_ParseAn
 			continue
 		}
 		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3]), Status: msg.Status})
-		if err := r.Err(); err != nil {
-			return err
-		}
+	}
+	if err := r.Err(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -789,6 +827,28 @@ func (s *CommandsServer) StalkCommand(msg *pb.Message, stream pb.Commands_ParseA
 	if err := r.Err(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *CommandsServer) DisableCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	_, body := extractCommand(msg)
+	retMessage := "Command wasn't found"
+	if _, ok := s.m[msg.Channel].Commands[body]; ok {
+		s.m[msg.Channel].Commands[body].Enabled = false
+		retMessage = fmt.Sprintf("!%s command has been disabled", body)
+	}
+	stream.Send(&pb.ReturnMessage{Text: retMessage, Status: msg.Status})
+	return nil
+}
+
+func (s *CommandsServer) EnableCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	_, body := extractCommand(msg)
+	retMessage := "Command wasn't found"
+	if _, ok := s.m[msg.Channel].Commands[body]; ok {
+		s.m[msg.Channel].Commands[body].Enabled = true
+		retMessage = fmt.Sprintf("!%s command has been enabled", body)
+	}
+	stream.Send(&pb.ReturnMessage{Text: retMessage, Status: msg.Status})
 	return nil
 }
 
