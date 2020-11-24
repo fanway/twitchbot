@@ -251,6 +251,29 @@ func PersonsList(prefix string) []string {
 	return buffer
 }
 
+func CrossFollow(username1, username2 string) []string {
+	db := database.Connect()
+	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		Output.Log(err)
+	}
+	defer tx.Rollback()
+	rows, err := tx.Query("SELECT ToName FROM Followers WHERE FromName=$1 OR FromName=$2 GROUP BY ToName HAVING COUNT(*) > 1;", username1, username2)
+	defer rows.Close()
+	if err != nil {
+		Output.Log(err)
+	}
+	var followArr []string
+	for rows.Next() {
+		var s string
+		rows.Scan(&s)
+		followArr = append(followArr, s)
+	}
+	tx.Commit()
+	return followArr
+}
+
 type VodsChat struct {
 	Comments []Comments `json:"comments"`
 	Next     string     `json:"_next,omitempty"`

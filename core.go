@@ -216,6 +216,12 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			}
 			bot := botInstances[terminal.Output.CurrentChannel]
 			bot.Status = args[0]
+		case "crossfollow":
+			if len(args) != 2 {
+				terminal.Output.Println("not enough args")
+				break
+			}
+			terminal.Output.Println(terminal.CrossFollow(args[0], args[1]))
 		}
 	}
 }
