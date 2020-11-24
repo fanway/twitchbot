@@ -55,7 +55,7 @@ func SetTerm() {
 }
 
 func ProcessTab(state string, buffer *buffer.Buffer) string {
-	state = strings.Trim(state, " ")
+	//state = strings.Trim(state, " ")
 	args := strings.Split(state, " ")
 
 	command := args[0]
@@ -63,12 +63,18 @@ func ProcessTab(state string, buffer *buffer.Buffer) string {
 
 	newState := command + " "
 	prefix := "%"
-	if len(args) > 0 {
-		prefix = args[0] + "%"
+	argsLen := len(args)
+	if argsLen > 0 {
+		prefix = args[argsLen-1] + "%"
+		if argsLen > 1 {
+			for i := 0; i < argsLen-1; i++ {
+				newState += args[i] + " "
+			}
+		}
 	}
 
 	switch command {
-	case "find":
+	case "find", "crossfollow":
 		if buffer.Empty() {
 			buffer.Append(PersonsList(prefix))
 			if buffer.Empty() {
