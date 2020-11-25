@@ -43,6 +43,7 @@ func Markov(channel string) (string, error) {
 		}
 	}
 	text := []string{"Begin"}
+	rand.Seed(time.Now().UnixNano())
 	for {
 		if text[len(text)-1] == "End" {
 			if len(text) >= 10 {
@@ -63,7 +64,6 @@ func Markov(channel string) (string, error) {
 			text = append(text, "End")
 			continue
 		}
-		rand.Seed(time.Now().UnixNano())
 		text = append(text, randSlice[rand.Intn(len(randSlice))])
 	}
 	msg = text[1]
