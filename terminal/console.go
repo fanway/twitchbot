@@ -110,52 +110,84 @@ func createPrefixBuffer(state string, commandsBuffer *buffer.Buffer) buffer.Buff
 }
 
 type Renderer interface {
-	render(string, string, int)
+	render([]rune, string, int)
+	applyWindow([]rune, int, *SlidingWindow) string
+	getWindow() *SlidingWindow
 }
 
 type InteractiveRenderer struct {
-	comments *[]string
+	comments      *[]string
+	SlidingWindow SlidingWindow
 }
 
-func (r *InteractiveRenderer) render(state string, arrowState string, arrowPointer int) {
+func (r *InteractiveRenderer) render(state []rune, arrowState string, arrowPointer int) {
 	fmt.Print("\033[H\033[J")
+	strState := string(state)
 	for i, _ := range *r.comments {
-		if strings.Contains((*r.comments)[i], state) {
+		if strings.Contains((*r.comments)[i], strState) {
 			fmt.Print((*r.comments)[i])
 		}
 	}
-	fmt.Print("\033[2K\r" + "> " + state + arrowState)
+	strState = r.applyWindow(state, arrowPointer, &r.SlidingWindow)
+	fmt.Print("\033[2K\r" + "> " + strState + arrowState)
 }
 
 type CoreRenderer struct {
 	CurrentChannel string
-	left           int
-	right          int
+	SlidingWindow  SlidingWindow
 }
 
-func (r *CoreRenderer) render(state string, arrowState string, arrowPointer int) {
+type SlidingWindow struct {
+	left  int
+	right int
+}
+
+func (r *CoreRenderer) render(state []rune, arrowState string, arrowPointer int) {
+	strState := r.applyWindow(state, arrowPointer, &r.SlidingWindow)
+	fmt.Print("\033[2K\r" + "[" + r.CurrentChannel + "]> " + strState + arrowState)
+}
+
+func (r *InteractiveRenderer) getWindow() *SlidingWindow {
+	return &r.SlidingWindow
+}
+
+func (r *CoreRenderer) getWindow() *SlidingWindow {
+	return &r.SlidingWindow
+}
+
+func applyWindow(state []rune, arrowPointer int, s *SlidingWindow) string {
 	col := int(terminalSize.Col)
 	lenState := len(state)
-	if lenState+5 > col {
-		if arrowPointer == lenState-r.left+1 {
-			if r.left > 0 {
-				r.left -= 1
+	if lenState+5 >= col {
+		if arrowPointer == lenState-s.left+1 {
+			if s.left > 0 {
+				s.left -= 1
 			}
-			r.right -= 1
-		} else if arrowPointer == lenState-r.right-1 {
-			r.left += 1
-			if r.right < lenState {
-				r.right += 1
+			if s.right-s.left+1 > col-5 {
+				s.right -= 1
+			}
+		} else if arrowPointer == lenState-s.right-1 {
+			s.left += 1
+			if s.right < lenState {
+				s.right += 1
 			}
 		}
-		if r.right > lenState {
-			r.right = lenState
+		if s.right > lenState {
+			s.right = lenState
 		}
-		state = state[r.left:r.right]
 	} else {
-		r.left, r.right = 0, lenState
+		s.right = lenState
 	}
-	fmt.Print("\033[2K\r" + "[" + r.CurrentChannel + "]> " + state + arrowState)
+	//fmt.Printf("left: %d, right: %d, arrowPointer: %d, lenState: %d, col: %d\n", s.left, s.right, arrowPointer, lenState, col)
+	return string(state[s.left:s.right])
+}
+
+func (r *InteractiveRenderer) applyWindow(state []rune, arrowPointer int, s *SlidingWindow) string {
+	return applyWindow(state, arrowPointer, s)
+}
+
+func (r *CoreRenderer) applyWindow(state []rune, arrowPointer int, s *SlidingWindow) string {
+	return applyWindow(state, arrowPointer, s)
 }
 
 func InteractiveSort() {
@@ -217,7 +249,7 @@ func (console *Console) Print(a ...interface{}) {
 	}
 	fmt.Println()
 	fmt.Println()
-	console.Renderer.render(string(console.state), console.arrowState, console.arrowPointer)
+	console.Renderer.render(console.state, console.arrowState, console.arrowPointer)
 }
 
 func (console *Console) Println(a ...interface{}) {
@@ -237,7 +269,7 @@ func (console *Console) Println(a ...interface{}) {
 	fmt.Println()
 	fmt.Println()
 	console.cursorW = 0
-	console.Renderer.render(string(console.state), console.arrowState, console.arrowPointer)
+	console.Renderer.render(console.state, console.arrowState, console.arrowPointer)
 }
 
 func (console *Console) Log(a ...interface{}) {
@@ -274,23 +306,27 @@ func (console *Console) ProcessConsole() (string, int) {
 	for {
 		// \033[H
 		lenState = len(console.state)
+		window := console.Renderer.getWindow()
 		terminalSize, err = unix.IoctlGetWinsize(int(os.Stdin.Fd()), unix.TIOCGWINSZ)
 		if err != nil {
 			continue
 		}
 		strState := string(console.state)
-		console.Renderer.render(strState, console.arrowState, console.arrowPointer)
+		console.Renderer.render(console.state, console.arrowState, console.arrowPointer)
 		bytes, numOfBytes := GetChar(os.Stdin)
 		ch := []rune(string(bytes[:numOfBytes]))
 		switch ch[0] {
 		case BACKSPACE:
-			if lenState > 0 {
-				n := lenState - console.arrowPointer - 1
+			diff := lenState - console.arrowPointer
+			if lenState > 0 && diff > window.left {
+				n := diff - 1
 				if n >= 0 {
 					console.state = append(console.state[:n], console.state[n+1:]...)
 					console.arrowState = ""
-					// TODO: rethink this part
-					for i := 0; i < console.arrowPointer; i++ {
+					for i := 0; i < window.right-diff; i++ {
+						console.arrowState += "\033[D"
+					}
+					if (window.right-window.left+1 == int(terminalSize.Col)-5) && window.right != lenState {
 						console.arrowState += "\033[D"
 					}
 				}
@@ -371,7 +407,8 @@ func (console *Console) ProcessConsole() (string, int) {
 					if console.arrowPointer < lenState {
 						//left
 						console.arrowPointer++
-						if uint16(console.arrowPointer) < terminalSize.Col-5 {
+						window := console.Renderer.getWindow()
+						if lenState-console.arrowPointer+1 > window.left || window.right-window.left+1 < int(terminalSize.Col)-5 {
 							console.arrowState += "\033[D"
 						}
 					}
@@ -388,6 +425,9 @@ func (console *Console) ProcessConsole() (string, int) {
 		default:
 			n := lenState - console.arrowPointer - 1
 			console.state = append(console.state[:n+1], append(ch, console.state[n+1:]...)...)
+			if window.right-window.left+1 < int(terminalSize.Col)-5 {
+				window.right += 1
+			}
 			prefixBuffer.Clear()
 			tabBuffer.Clear()
 		}
