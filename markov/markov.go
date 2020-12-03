@@ -54,7 +54,7 @@ func Markov(channel string) (string, error) {
 		word := text[len(text)-1]
 		var randSlice []string
 		// take random next word, taking into account the frequency of words
-		for k, _ := range m[word] {
+		for k := range m[word] {
 			for i := 0; i < m[word][k]; i++ {
 				// m[word][k] is the number of times the word "word" comes before the word "k"
 				randSlice = append(randSlice, k)

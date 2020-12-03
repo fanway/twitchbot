@@ -198,7 +198,7 @@ func (bot *Bot) warning(username, id, reason string, seconds int) {
 		delete(bot.Warn.Warnings, username)
 		return
 	}
-	for i, _ := range *warnings {
+	for i := range *warnings {
 		if time.Since((*warnings)[i].TimeCreated)*time.Second > 1800 {
 			(*warnings)[i] = (*warnings)[length]
 			*warnings = (*warnings)[:length-1]
@@ -213,7 +213,7 @@ func (bot *Bot) checkMessage(msg *Message) bool {
 	if len(split) > 1 {
 		split = append(split, msg.Text)
 	}
-	for i, _ := range split {
+	for i := range split {
 		if _, ok := bot.BadWords[split[i]]; ok {
 			bot.warning(msg.Username, msg.ID, "Warning: Usage of explicit language", 300)
 			return true
@@ -355,7 +355,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			}
 		case "SpamAttack":
 			bot.Spam.RLock()
-			for i, _ := range bot.Spam.Messages {
+			for i := range bot.Spam.Messages {
 				if strings.Contains(message.Text, bot.Spam.Messages[i]) {
 					bot.ban(message.Username)
 				}

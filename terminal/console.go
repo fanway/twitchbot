@@ -123,7 +123,7 @@ type InteractiveRenderer struct {
 func (r *InteractiveRenderer) render(state []rune, arrowState string, arrowPointer int) {
 	fmt.Print("\033[H\033[J")
 	strState := string(state)
-	for i, _ := range *r.comments {
+	for i := range *r.comments {
 		if strings.Contains((*r.comments)[i], strState) {
 			fmt.Print((*r.comments)[i])
 		}
@@ -239,7 +239,7 @@ func (console *Console) Print(a ...interface{}) {
 	} else {
 		fmt.Print("\033[1F")
 	}
-	for i, _ := range a {
+	for i := range a {
 		if i > 0 {
 			fmt.Print(" ")
 			console.cursorW += 1
@@ -260,7 +260,7 @@ func (console *Console) Println(a ...interface{}) {
 	} else {
 		fmt.Print("\033[1F")
 	}
-	for i, _ := range a {
+	for i := range a {
 		if i > 0 {
 			fmt.Print(" ")
 		}
