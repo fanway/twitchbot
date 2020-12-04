@@ -167,14 +167,6 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   MIDDLE,
 			Handler: s.RemindCommand,
 		},
-		// service command
-		"fetchreminder": &Command{
-			Enabled: true,
-			Name:    "fetchreminder",
-			Cd:      5,
-			Level:   TOP,
-			Handler: s.FetchReminder,
-		},
 		// !afk <message>
 		"afk": &Command{
 			Enabled: true,
@@ -211,16 +203,10 @@ func (s *CommandsServer) initCommands(channel string) {
 	s.m[channel] = c
 }
 
-type Remind struct {
-	sync.Mutex
-	r []string
-}
-
 type Utils struct {
 	SmartVote      SmartVote
 	RequestedSongs RequestedSongs
 	File           *os.File
-	Remind         Remind
 }
 
 type SmartVote struct {
@@ -706,13 +692,6 @@ func (s *CommandsServer) GetLevel(msg *pb.Message, stream pb.Commands_ParseAndEx
 	}
 	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s Your level is: %s", msg.Username, message), Status: msg.Status})
 	return nil
-}
-
-func (s *CommandsServer) reminder(msg *pb.Message) {
-	retMsg := "@" + msg.Username + " " + msg.Text
-	s.m[msg.Channel].Utils.Remind.Lock()
-	s.m[msg.Channel].Utils.Remind.r = append(s.m[msg.Channel].Utils.Remind.r, retMsg)
-	s.m[msg.Channel].Utils.Remind.Unlock()
 }
 
 func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {

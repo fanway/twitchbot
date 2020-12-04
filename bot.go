@@ -228,25 +228,17 @@ func (bot *Bot) checkMessage(msg *Message) bool {
 }
 
 func (bot *Bot) checkReminders() {
-	ticker := time.NewTicker(10 * time.Second)
+	conn := pool.Get()
+	defer conn.Close()
+	conn.Send("SUBSCRIBE", "reminders")
+	conn.Flush()
 	for {
-		stream, err := bot.GrpcClient.ParseAndExec(context.Background(), &pb.Message{Channel: bot.Channel, Text: "!fetchreminder", Status: bot.Status, Level: 2})
+		reminders, err := redis.Strings(conn.Receive())
 		if err != nil {
 			terminal.Output.Log(err)
-			return
+			continue
 		}
-		for {
-			in, err := stream.Recv()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				terminal.Output.Log(err)
-				break
-			}
-			bot.SendMessage(in.Text)
-		}
-		<-ticker.C
+		bot.SendMessage(reminders[2])
 	}
 }
 
