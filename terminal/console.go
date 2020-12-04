@@ -133,7 +133,7 @@ func (r *InteractiveRenderer) render(state []rune, arrowState string, arrowPoint
 }
 
 type CoreRenderer struct {
-	CurrentChannel string
+	CurrentChannel *string
 	SlidingWindow  SlidingWindow
 }
 
@@ -144,7 +144,7 @@ type SlidingWindow struct {
 
 func (r *CoreRenderer) render(state []rune, arrowState string, arrowPointer int) {
 	strState := r.applyWindow(state, arrowPointer, &r.SlidingWindow)
-	fmt.Print("\033[2K\r" + "[" + r.CurrentChannel + "]> " + strState + arrowState)
+	fmt.Print("\033[2K\r" + "[" + *r.CurrentChannel + "]> " + strState + arrowState)
 }
 
 func (r *InteractiveRenderer) getWindow() *SlidingWindow {

@@ -231,7 +231,7 @@ func main() {
 	terminal.Output.CurrentChannel = "#"
 	botInstaces := make(map[string]*Bot)
 	terminal.SetTerm()
-	coreRenderer := terminal.CoreRenderer{CurrentChannel: terminal.Output.CurrentChannel}
+	coreRenderer := terminal.CoreRenderer{CurrentChannel: &terminal.Output.CurrentChannel}
 	terminal.Output.Renderer = &coreRenderer
 	for {
 		args, status := terminal.Output.ProcessConsole()
