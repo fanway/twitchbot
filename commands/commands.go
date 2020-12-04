@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"database/sql"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"io"
@@ -17,12 +19,14 @@ import (
 	"time"
 	pb "twitchStats/commands/pb"
 	"twitchStats/database"
+	"twitchStats/database/cache"
 	"twitchStats/logsparser"
 	"twitchStats/markov"
 	"twitchStats/request"
 	"twitchStats/spotify"
 	"twitchStats/terminal"
 
+	"github.com/gomodule/redigo/redis"
 	"google.golang.org/grpc"
 )
 
@@ -31,6 +35,8 @@ const (
 	MIDDLE
 	TOP
 )
+
+var pool *redis.Pool
 
 type CommandsServer struct {
 	pb.UnimplementedCommandsServer
@@ -48,7 +54,7 @@ func (s *CommandsServer) initCommands(channel string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c := &Commands{Utils: Utils{File: logfile, Afk: Afk{Users: make(map[string]*AfkUsers)}}, Commands: map[string]*Command{
+	c := &Commands{Utils: Utils{File: logfile}, Commands: map[string]*Command{
 		// !logs <username, timeStart, timeEnd>
 		"logs": &Command{
 			Enabled: true,
@@ -177,14 +183,6 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   MIDDLE,
 			Handler: s.AfkCommand,
 		},
-		// service command
-		"checkafk": &Command{
-			Enabled: true,
-			Name:    "checkafk",
-			Cd:      5,
-			Level:   TOP,
-			Handler: s.checkAfk,
-		},
 		// !stalk <username>
 		"stalk": &Command{
 			Enabled: true,
@@ -223,7 +221,6 @@ type Utils struct {
 	RequestedSongs RequestedSongs
 	File           *os.File
 	Remind         Remind
-	Afk            Afk
 }
 
 type SmartVote struct {
@@ -242,16 +239,6 @@ type Song struct {
 type RequestedSongs struct {
 	sync.RWMutex
 	Songs []Song
-}
-
-type Afk struct {
-	sync.RWMutex
-	Users map[string]*AfkUsers
-}
-
-type AfkUsers struct {
-	Message string
-	Time    time.Time
 }
 
 func extractCommand(msg *pb.Message) (string, string) {
@@ -745,59 +732,27 @@ func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_Parse
 	} else {
 		remindMessage = params[1]
 	}
-	msg.Text = remindMessage
-	time.AfterFunc(t, func() { s.reminder(msg) })
+	retMsg := "@" + msg.Username + " " + remindMessage
+	time.AfterFunc(t, func() {
+		conn := pool.Get()
+		defer conn.Close()
+		conn.Send("PUBLISH", "reminders", retMsg)
+		conn.Flush()
+	})
 	return nil
-}
-
-func (s *CommandsServer) FetchReminder(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
-	s.m[msg.Channel].Utils.Remind.Lock()
-	if len(s.m[msg.Channel].Utils.Remind.r) != 0 {
-		for _, r := range s.m[msg.Channel].Utils.Remind.r {
-			err := stream.Send(&pb.ReturnMessage{Text: r, Status: msg.Status})
-			if err != nil {
-				return err
-			}
-		}
-	}
-	s.m[msg.Channel].Utils.Remind.r = s.m[msg.Channel].Utils.Remind.r[:0]
-	s.m[msg.Channel].Utils.Remind.Unlock()
-	return nil
-}
-
-func (s *CommandsServer) checkAfk(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
-	var retText string
-
-	s.m[msg.Channel].Utils.Afk.RLock()
-	if v, ok := s.m[msg.Channel].Utils.Afk.Users[msg.Username]; ok {
-		s.m[msg.Channel].Utils.Afk.RUnlock()
-		retText = fmt.Sprintf("%s was afk: %s (%s)", msg.Username, v.Message, time.Since(v.Time).Truncate(time.Second))
-		s.m[msg.Channel].Utils.Afk.Lock()
-		delete(s.m[msg.Channel].Utils.Afk.Users, msg.Username)
-		s.m[msg.Channel].Utils.Afk.Unlock()
-		stream.Send(&pb.ReturnMessage{Text: retText, Status: msg.Status})
-		return nil
-	}
-	_, body := extractCommand(msg)
-	if len(body) == 0 {
-		s.m[msg.Channel].Utils.Afk.RUnlock()
-		return nil
-	}
-	if v, ok := s.m[msg.Channel].Utils.Afk.Users[body]; ok {
-		s.m[msg.Channel].Utils.Afk.RUnlock()
-		retText = fmt.Sprintf("@%s %s is afk: %s. Last seen: %s ago", msg.Username, body, v.Message, time.Since(v.Time).Truncate(time.Second))
-		stream.Send(&pb.ReturnMessage{Text: retText, Status: msg.Status})
-		return nil
-	}
-	s.m[msg.Channel].Utils.Afk.RUnlock()
-	return errors.New("checkafk: username was not found")
 }
 
 func (s *CommandsServer) AfkCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	_, body := extractCommand(msg)
-	s.m[msg.Channel].Utils.Afk.Lock()
-	s.m[msg.Channel].Utils.Afk.Users[msg.Username] = &AfkUsers{body, time.Now()}
-	s.m[msg.Channel].Utils.Afk.Unlock()
+	conn := pool.Get()
+	defer conn.Close()
+	var b bytes.Buffer
+	enc := gob.NewEncoder(&b)
+	enc.Encode(struct {
+		Message string
+		Time    time.Time
+	}{body, time.Now()})
+	conn.Do("HSET", msg.Channel, "afk:"+msg.Username, b.Bytes())
 	return nil
 }
 
@@ -865,6 +820,7 @@ func main() {
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterCommandsServer(grpcServer, newServer())
+	pool = cache.GetPool()
 	fmt.Println("Grpc server started")
 	grpcServer.Serve(lis)
 }

@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +25,7 @@ import (
 	"twitchStats/request"
 	"twitchStats/terminal"
 
+	"github.com/gomodule/redigo/redis"
 	"google.golang.org/grpc"
 )
 
@@ -105,7 +108,7 @@ func (bot *Bot) Connect() {
 	}
 	bot.GrpcClient = pb.NewCommandsClient(grpcConn)
 	go bot.checkReminders()
-	go bot.reader(wg)
+	go bot.reader(wg, redisConn)
 	terminal.Output.Println("connected to " + bot.Channel)
 	wg.Wait()
 }
@@ -124,11 +127,13 @@ func (bot *Bot) SendMessage(msg string) {
 }
 
 // reader and parser
-func (bot *Bot) reader(wg *sync.WaitGroup) {
+func (bot *Bot) reader(wg *sync.WaitGroup, redisConn redis.Conn) {
 	tp := textproto.NewReader(bufio.NewReader(bot.Conn))
-	logChan := make(chan Message)
+	logChan := make(chan *Message)
+	afkChan := make(chan *Message)
 	defer wg.Done()
 	go bot.logsWriter(logChan)
+	go bot.checkAfk(afkChan, redisConn)
 	for {
 		select {
 		case <-bot.StopChannel:
@@ -140,7 +145,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup) {
 				return
 			}
 			// parsing chat
-			go bot.parseChat(line, logChan)
+			go bot.parseChat(line, logChan, afkChan, redisConn)
 		}
 	}
 }
@@ -152,7 +157,7 @@ type Message struct {
 	ID       string
 }
 
-func (bot *Bot) logsWriter(logChan <-chan Message) {
+func (bot *Bot) logsWriter(logChan <-chan *Message) {
 	w := bufio.NewWriter(bot.File)
 	for {
 		select {
@@ -245,31 +250,46 @@ func (bot *Bot) checkReminders() {
 	}
 }
 
-func (bot *Bot) checkAfk(msg *Message) {
+type afkData struct {
+	Message string
+	Time    time.Time
+}
+
+func (bot *Bot) checkAfk(ch <-chan *Message, conn redis.Conn) {
 	re := regexp.MustCompile(`@(\w+)`)
-	match := re.FindStringSubmatch(msg.Text)
-	var cmd string
-	if len(match) == 0 {
-		cmd = "!checkafk"
-	} else {
-		cmd = "!checkafk " + match[1]
-	}
-	stream, err := bot.GrpcClient.ParseAndExec(context.Background(), &pb.Message{Channel: bot.Channel, Text: cmd, Username: msg.Username, Status: bot.Status, Level: 2})
-	if err != nil {
-		terminal.Output.Log(err)
-		return
-	}
+	var b bytes.Buffer
+	var afk afkData
+	var retText string
+	dec := gob.NewDecoder(&b)
 	for {
-		in, err := stream.Recv()
-		if err == io.EOF {
-			break
+		msg := <-ch
+		field := "afk:" + msg.Username
+		data, err := redis.Bytes(conn.Do("HGET", bot.Channel, field))
+		if err == nil {
+			b.Write(data)
+			dec.Decode(&afk)
+			retText = fmt.Sprintf("%s was afk: %s (%s)", msg.Username, afk.Message, time.Since(afk.Time).Truncate(time.Second))
+			bot.SendMessage(retText)
+			conn.Do("HDEL", bot.Channel, field)
+			b.Reset()
+		} else {
+			terminal.Output.Log(err)
 		}
+		match := re.FindStringSubmatch(msg.Text)
+		if len(match) == 0 {
+			continue
+		}
+		field = "afk:" + match[1]
+		data, err = redis.Bytes(conn.Do("HGET", bot.Channel, field))
 		if err != nil {
 			terminal.Output.Log(err)
-			break
+			continue
 		}
-		bot.Status = in.Status
-		bot.SendMessage(in.Text)
+		b.Write(data)
+		dec.Decode(&afk)
+		retText = fmt.Sprintf("@%s %s is afk: %s. Last seen: %s ago", msg.Username, match[1], afk.Message, time.Since(afk.Time).Truncate(time.Second))
+		bot.SendMessage(retText)
+		b.Reset()
 	}
 }
 func (bot *Bot) pasteWriter(msg *Message) {
@@ -324,7 +344,7 @@ type Spam struct {
 	Messages []string
 }
 
-func (bot *Bot) parseChat(line string, logChan chan<- Message) {
+func (bot *Bot) parseChat(line string, logChan chan<- *Message, afkChan chan<- *Message, redisConn redis.Conn) {
 	if strings.Contains(line, "PRIVMSG") {
 		re := regexp.MustCompile(`emotes=(.*?);|@(.*?)\.tmi\.twitch\.tv|PRIVMSG.*?:(.*)|id=(.*?);`)
 		match := re.FindAllStringSubmatch(line[1:], -1)
@@ -334,7 +354,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			Username: match[4][2],
 			Text:     match[5][3],
 		}
-		logChan <- message
+		logChan <- &message
 		messageLength := len(message.Text)
 		switch bot.Status {
 		case "Running":
@@ -344,7 +364,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- Message) {
 			if bot.checkMessage(&message) {
 				return
 			}
-			bot.checkAfk(&message)
+			afkChan <- &message
 			if message.Text[0] == '!' {
 				bot.processCommands(&message)
 			}
