@@ -747,10 +747,14 @@ func (s *CommandsServer) AfkCommand(msg *pb.Message, stream pb.Commands_ParseAnd
 	defer conn.Close()
 	var b bytes.Buffer
 	enc := gob.NewEncoder(&b)
-	enc.Encode(struct {
+	err := enc.Encode(struct {
 		Message string
 		Time    time.Time
 	}{body, time.Now()})
+	if err != nil {
+		terminal.Output.Log(err)
+		return err
+	}
 	conn.Do("HSET", msg.Channel, "afk:"+msg.Username, b.Bytes())
 	return nil
 }

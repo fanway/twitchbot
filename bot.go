@@ -164,7 +164,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup, redisConn redis.Conn) {
 	afkChan := make(chan *Message)
 	defer wg.Done()
 	go bot.logsWriter(logChan)
-	go bot.checkAfk(afkChan, redisConn)
+	go bot.checkAfk(afkChan)
 	for {
 		select {
 		case <-bot.StopChannel:
@@ -279,19 +279,24 @@ type afkData struct {
 	Time    time.Time
 }
 
-func (bot *Bot) checkAfk(ch <-chan *Message, conn redis.Conn) {
+func (bot *Bot) checkAfk(ch <-chan *Message) {
 	re := regexp.MustCompile(`@(\w+)`)
 	var b bytes.Buffer
-	var afk afkData
 	var retText string
-	dec := gob.NewDecoder(&b)
+	var afk afkData
+	var dec *gob.Decoder
+	conn := pool.Get()
 	for {
 		msg := <-ch
 		field := "afk:" + msg.Username
 		data, err := redis.Bytes(conn.Do("HGET", bot.Channel, field))
 		if err == nil {
+			dec = gob.NewDecoder(&b)
 			b.Write(data)
-			dec.Decode(&afk)
+			err := dec.Decode(&afk)
+			if err != nil {
+				terminal.Output.Log(err)
+			}
 			retText = fmt.Sprintf("%s was afk: %s (%s)", msg.Username, afk.Message, time.Since(afk.Time).Truncate(time.Second))
 			bot.SendMessage(retText)
 			conn.Do("HDEL", bot.Channel, field)
@@ -310,6 +315,7 @@ func (bot *Bot) checkAfk(ch <-chan *Message, conn redis.Conn) {
 			continue
 		}
 		b.Write(data)
+		dec = gob.NewDecoder(&b)
 		dec.Decode(&afk)
 		retText = fmt.Sprintf("@%s %s is afk: %s. Last seen: %s ago", msg.Username, match[1], afk.Message, time.Since(afk.Time).Truncate(time.Second))
 		bot.SendMessage(retText)
