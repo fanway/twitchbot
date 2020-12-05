@@ -62,7 +62,7 @@ func sendSmartVote() {
 		Level:   2,
 	})
 	if err != nil {
-		console.Log(err)
+		fmt.Println(err)
 		return
 	}
 	for {
@@ -71,7 +71,7 @@ func sendSmartVote() {
 			break
 		}
 		if err != nil {
-			console.Log(err)
+			fmt.Println(err)
 			break
 		}
 		fmt.Println(in.Text)
@@ -111,7 +111,7 @@ func sendVoteOptions() {
 		Level:   2,
 	})
 	if err != nil {
-		console.Log(err)
+		fmt.Println(err)
 		return
 	}
 	for {
@@ -120,7 +120,6 @@ func sendVoteOptions() {
 			break
 		}
 		if err != nil {
-			console.Log(err)
 			break
 		}
 		re := regexp.MustCompile(`Total votes (\d*)|\((\d*)\)`)
