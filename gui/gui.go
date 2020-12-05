@@ -4,15 +4,16 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"regexp"
 	"strconv"
 	"time"
 
 	pb "twitchStats/commands/pb"
+	"twitchStats/database/cache"
 
 	"github.com/AllenDang/giu"
 	"github.com/AllenDang/giu/imgui"
+	"github.com/gomodule/redigo/redis"
 	"google.golang.org/grpc"
 )
 
@@ -23,6 +24,7 @@ var (
 	str            []string
 	counter        []int
 	client         pb.CommandsClient
+	redisConn      redis.Conn
 	quit           chan bool
 	status         bool
 	channel        string
@@ -79,6 +81,10 @@ func sendSmartVote() {
 			for {
 				select {
 				case <-quit:
+					_, err := redisConn.Do("HSET", channel, "status", "Running")
+					if err != nil {
+						fmt.Println(err)
+					}
 					return
 				default:
 					sendVoteOptions()
@@ -103,7 +109,6 @@ func sendVoteOptions() {
 		Channel: channel,
 		Text:    "!voteoptions",
 		Level:   2,
-		Status:  "Smartvote",
 	})
 	if err != nil {
 		console.Log(err)
@@ -143,7 +148,9 @@ func main() {
 	if err != nil {
 		fmt.Println("Unable to connect to grpc")
 	}
+	defer grpcConn.Close()
 	client = pb.NewCommandsClient(grpcConn)
-
+	redisConn = cache.GetPool().Get()
+	defer redisConn.Close()
 	wnd.Main(loop)
 }

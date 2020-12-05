@@ -11,13 +11,9 @@ message Message {
     string emotes = 4;
     string id = 5;
     int32 level = 6;
-    string status = 7;
 }
 
-message ReturnMessage {
-    string text = 1;
-    string status = 2;
-}
+message ReturnMessage { string text = 1; }
 
 service Commands {
     rpc parseAndExec(Message) returns (stream ReturnMessage) {}

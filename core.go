@@ -8,14 +8,18 @@ import (
 	"os"
 	"strings"
 	"time"
+	"twitchStats/database/cache"
 	"twitchStats/logsparser"
 	"twitchStats/markov"
 	"twitchStats/spotify"
 	"twitchStats/terminal"
 
+	"github.com/gomodule/redigo/redis"
 	_ "github.com/mattn/go-sqlite3"
 	//"io/ioutil"
 )
+
+var pool *redis.Pool
 
 func parseCommand(str string, botInstances map[string]*Bot) {
 	commandsChain := strings.Split(str, "|")
@@ -117,7 +121,12 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			duration := time.Duration(90) * time.Second
 			switch len(args) {
 			case 0:
-				bot.Status = "Running"
+				conn := pool.Get()
+				defer conn.Close()
+				_, err := conn.Do("HSET", bot.Channel, "status", "Running")
+				if err != nil {
+					terminal.Output.Log(err)
+				}
 				bot.Spam.Clear()
 				break
 			case 2:
@@ -130,7 +139,12 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			}
 			bot.Spam.Add(args[0])
 			bot.SpamHistory(args[0], duration)
-			bot.Status = "SpamAttack"
+			conn := pool.Get()
+			defer conn.Close()
+			_, err := conn.Do("HSET", bot.Channel, "status", "SpamAttack")
+			if err != nil {
+				terminal.Output.Log(err)
+			}
 		case "loadcomments":
 			if len(args) != 1 {
 				terminal.Output.Println("something went wrong")
@@ -215,7 +229,12 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 				break
 			}
 			bot := botInstances[terminal.Output.CurrentChannel]
-			bot.Status = args[0]
+			conn := pool.Get()
+			defer conn.Close()
+			_, err := conn.Do("HSET", bot.Channel, "status", args[0])
+			if err != nil {
+				terminal.Output.Log(err)
+			}
 		case "crossfollow":
 			if len(args) != 2 {
 				terminal.Output.Println("not enough args")
@@ -230,6 +249,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	terminal.Output.CurrentChannel = "#"
 	botInstaces := make(map[string]*Bot)
+	pool = cache.GetPool()
 	terminal.SetTerm()
 	coreRenderer := terminal.CoreRenderer{CurrentChannel: &terminal.Output.CurrentChannel}
 	terminal.Output.Renderer = &coreRenderer

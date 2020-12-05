@@ -296,7 +296,7 @@ func (cmd *Command) Cooldown(level int) error {
 }
 
 func (s *CommandsServer) StopVoteCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
-	stream.Send(&pb.ReturnMessage{Text: "", Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: ""})
 	return nil
 }
 
@@ -358,7 +358,7 @@ func (s *CommandsServer) GetUserSongs(msg *pb.Message, stream pb.Commands_ParseA
 	for i := 1; i < len(songs); i++ {
 		retMsg += ", " + songs[i]
 	}
-	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, retMsg), Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, retMsg)})
 	return nil
 }
 
@@ -371,7 +371,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 	}
 	if len(track.Tracks.Items) == 0 {
 
-		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s track wansn't found", msg.Username), Status: msg.Status})
+		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s track wansn't found", msg.Username)})
 		return errors.New("Track wasn't found")
 	}
 
@@ -384,7 +384,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 	s.m[msg.Username].Utils.RequestedSongs.Lock()
 	defer s.m[msg.Username].Utils.RequestedSongs.Unlock()
 	s.m[msg.Username].Utils.RequestedSongs.Songs = append(s.m[msg.Username].Utils.RequestedSongs.Songs, Song{Username: msg.Username, SongName: trackName, Uri: track.Tracks.Items[0].URI, Duration: time.Duration(track.Tracks.Items[0].DurationMs) * time.Millisecond})
-	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s was added to the playlist", msg.Username, trackName), Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s was added to the playlist", msg.Username, trackName)})
 	return nil
 }
 
@@ -420,7 +420,7 @@ func (s *CommandsServer) CurrentTrack(msg *pb.Message, stream pb.Commands_ParseA
 		return err
 	}
 	if track != "" {
-		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, track), Status: msg.Status})
+		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, track)})
 	}
 	return nil
 }
@@ -448,7 +448,7 @@ func (s *CommandsServer) LogsCommand(msg *pb.Message, stream pb.Commands_ParseAn
 		if err != nil {
 			continue
 		}
-		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3]), Status: msg.Status})
+		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3])})
 	}
 	if err := r.Err(); err != nil {
 		return err
@@ -462,6 +462,14 @@ func (s *CommandsServer) SmartVoteCommand(msg *pb.Message, stream pb.Commands_Pa
 	if len(split) < 2 {
 		return errors.New("!smartvote: not enough args")
 	}
+
+	conn := pool.Get()
+	defer conn.Close()
+	_, err := conn.Do("HSET", msg.Channel, "status", "Smartvote")
+	if err != nil {
+		return err
+	}
+
 	str := "GOLOSOVANIE"
 	lowerBound, err := strconv.Atoi(split[0])
 	if err != nil {
@@ -477,12 +485,18 @@ func (s *CommandsServer) SmartVoteCommand(msg *pb.Message, stream pb.Commands_Pa
 		var value int32
 		s.m[msg.Channel].Utils.SmartVote.Options[i] = &value
 	}
-	stream.Send(&pb.ReturnMessage{Text: str, Status: "SmartVote"})
+	stream.Send(&pb.ReturnMessage{Text: str})
 	return nil
 }
 
 func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
-	if msg.Status != "Smartvote" {
+	conn := pool.Get()
+	defer conn.Close()
+	status, err := redis.String(conn.Do("HGET", msg.Channel, "status"))
+	if err != nil {
+		return err
+	}
+	if status != "Smartvote" {
 		return errors.New("There is not any vote")
 	}
 	keys := []int{}
@@ -503,12 +517,18 @@ func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_
 		percent = float32(value) / float32(total) * 100
 		str += fmt.Sprintf(", %d: %.1f%%(%d)", keys[i], percent, value)
 	}
-	stream.Send(&pb.ReturnMessage{Text: str, Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: str})
 	return nil
 }
 
 func (s *CommandsServer) VoteCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
-	if msg.Status != "Smartvote" {
+	conn := pool.Get()
+	defer conn.Close()
+	status, err := redis.String(conn.Do("HGET", msg.Channel, "status"))
+	if err != nil {
+		return err
+	}
+	if status != "Smartvote" {
 		return errors.New("Wrong status")
 	}
 	_, body := extractCommand(msg)
@@ -648,7 +668,7 @@ func (s *CommandsServer) Asciify(msg *pb.Message, stream pb.Commands_ParseAndExe
 	if err != nil {
 		return err
 	}
-	stream.Send(&pb.ReturnMessage{Text: asciifiedImage, Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: asciifiedImage})
 	return nil
 }
 
@@ -657,7 +677,7 @@ func (s *CommandsServer) Markov(msg *pb.Message, stream pb.Commands_ParseAndExec
 	if err != nil {
 		return err
 	}
-	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, markovMsg), Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, markovMsg)})
 	return nil
 }
 
@@ -676,7 +696,7 @@ func (s *CommandsServer) GetCommands(msg *pb.Message, stream pb.Commands_ParseAn
 	for i := 1; i < len(keys); i++ {
 		commands += ", " + keys[i]
 	}
-	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, commands), Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, commands)})
 	return nil
 }
 
@@ -690,7 +710,7 @@ func (s *CommandsServer) GetLevel(msg *pb.Message, stream pb.Commands_ParseAndEx
 	case 2:
 		message = "top"
 	}
-	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s Your level is: %s", msg.Username, message), Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s Your level is: %s", msg.Username, message)})
 	return nil
 }
 
@@ -757,7 +777,7 @@ func (s *CommandsServer) StalkCommand(msg *pb.Message, stream pb.Commands_ParseA
 		}
 		retMessage = fmt.Sprintf("%s was seen %s ago, last message: %s", body, time.Since(t).Truncate(time.Second), parsedStr[3])
 	}
-	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, retMessage), Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, retMessage)})
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -771,7 +791,7 @@ func (s *CommandsServer) DisableCommand(msg *pb.Message, stream pb.Commands_Pars
 		s.m[msg.Channel].Commands[body].Enabled = false
 		retMessage = fmt.Sprintf("!%s command has been disabled", body)
 	}
-	stream.Send(&pb.ReturnMessage{Text: retMessage, Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: retMessage})
 	return nil
 }
 
@@ -782,7 +802,7 @@ func (s *CommandsServer) EnableCommand(msg *pb.Message, stream pb.Commands_Parse
 		s.m[msg.Channel].Commands[body].Enabled = true
 		retMessage = fmt.Sprintf("!%s command has been enabled", body)
 	}
-	stream.Send(&pb.ReturnMessage{Text: retMessage, Status: msg.Status})
+	stream.Send(&pb.ReturnMessage{Text: retMessage})
 	return nil
 }
 

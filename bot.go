@@ -106,7 +106,38 @@ func (bot *Bot) Connect() {
 	if err != nil {
 		fmt.Println("Unable to connect to grpc")
 	}
+	defer grpcConn.Close()
 	bot.GrpcClient = pb.NewCommandsClient(grpcConn)
+	redisConn := pool.Get()
+	defer redisConn.Close()
+
+	redisInvalidateConn := pool.Get()
+	defer redisInvalidateConn.Close()
+
+	invalidateConnId, err := redis.Int(redisInvalidateConn.Do("CLIENT", "ID"))
+	if err != nil {
+		terminal.Output.Log(err)
+		return
+	}
+
+	_, err = redisConn.Do("CLIENT", "TRACKING", "on", "REDIRECT", invalidateConnId)
+	if err != nil {
+		terminal.Output.Log(err)
+	}
+
+	status, err := redis.String(redisConn.Do("HGET", bot.Channel, "status"))
+	if err != nil {
+		terminal.Output.Log(err)
+		_, err = redisConn.Do("HSET", bot.Channel, "status", "Running")
+	}
+
+	if status != "" {
+		bot.Status = status
+	} else {
+		bot.Status = "Running"
+	}
+
+	go bot.checkStatus(redisInvalidateConn, redisConn)
 	go bot.checkReminders()
 	go bot.reader(wg, redisConn)
 	terminal.Output.Println("connected to " + bot.Channel)
@@ -232,6 +263,7 @@ func (bot *Bot) checkReminders() {
 	defer conn.Close()
 	conn.Send("SUBSCRIBE", "reminders")
 	conn.Flush()
+	conn.Receive()
 	for {
 		reminders, err := redis.Strings(conn.Receive())
 		if err != nil {
@@ -296,6 +328,28 @@ func (bot *Bot) pasteWriter(msg *Message) {
 		terminal.Output.Log(err)
 	}
 	pasteWriter.Flush()
+}
+
+func (bot *Bot) checkStatus(invalidateConn redis.Conn, getConn redis.Conn) {
+	_, err := invalidateConn.Do("SUBSCRIBE", "__redis__:invalidate")
+	if err != nil {
+		terminal.Output.Log(err)
+		return
+	}
+	for {
+		_, err := invalidateConn.Receive()
+		if err != nil {
+			terminal.Output.Log(err)
+			continue
+		}
+
+		status, err := redis.String(getConn.Do("HGET", bot.Channel, "status"))
+		if err != nil {
+			terminal.Output.Log(err)
+		}
+		terminal.Output.Println(status)
+		bot.Status = status
+	}
 }
 
 func (bot *Bot) SpamHistory(spamMsg string, duration time.Duration) error {
@@ -390,7 +444,6 @@ func (bot *Bot) processCommands(message *Message) {
 		Emotes:   message.Emotes,
 		Id:       message.ID,
 		Level:    int32(level),
-		Status:   bot.Status,
 	})
 	if err != nil {
 		terminal.Output.Log(err)
@@ -405,7 +458,6 @@ func (bot *Bot) processCommands(message *Message) {
 			terminal.Output.Log(err)
 			break
 		}
-		bot.Status = in.Status
 		bot.SendMessage(in.Text)
 	}
 }
@@ -572,7 +624,6 @@ func startBot(channel string, botInstances map[string]*Bot) {
 		StopChannel: make(chan struct{}),
 		BadWords:    initBadWords(),
 		Authority:   initAuthority(),
-		Status:      "Running",
 		Warn:        Warn{Warnings: make(map[string]*[]Warning)},
 	}
 	botInstances[channel] = &bot
