@@ -52,6 +52,7 @@ type Bot struct {
 	Warn        Warn
 	BadWords    map[string]struct{}
 	Spam        Spam
+	Stats       map[string]*Stats
 	GrpcClient  pb.CommandsClient
 }
 
@@ -162,9 +163,11 @@ func (bot *Bot) reader(wg *sync.WaitGroup, redisConn redis.Conn) {
 	tp := textproto.NewReader(bufio.NewReader(bot.Conn))
 	logChan := make(chan *Message)
 	afkChan := make(chan *Message)
+	statsChan := make(chan string)
 	defer wg.Done()
 	go bot.logsWriter(logChan)
 	go bot.checkAfk(afkChan)
+	go bot.checkStats(statsChan)
 	for {
 		select {
 		case <-bot.StopChannel:
@@ -176,7 +179,7 @@ func (bot *Bot) reader(wg *sync.WaitGroup, redisConn redis.Conn) {
 				return
 			}
 			// parsing chat
-			go bot.parseChat(line, logChan, afkChan, redisConn)
+			go bot.parseChat(line, logChan, afkChan, statsChan, redisConn)
 		}
 	}
 }
@@ -378,6 +381,104 @@ func (bot *Bot) checkStatus(invalidateConn redis.Conn, getConn redis.Conn) {
 	}
 }
 
+type Stats struct {
+	MsgCount     int
+	MsgCountPrev int
+	WatchTime    time.Duration
+	LastCheck    time.Time
+}
+
+func (bot *Bot) checkStats(ch <-chan string) {
+	ticker := time.NewTicker(5 * time.Minute)
+	ticker1 := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	defer ticker1.Stop()
+	db := database.Connect()
+	defer db.Close()
+	conn := pool.Get()
+	defer conn.Close()
+	var b bytes.Buffer
+
+	for {
+		select {
+		case <-ticker.C:
+			url := "https://tmi.twitch.tv/group/user/" + bot.Channel[1:] + "/chatters"
+			req, _ := http.NewRequest("GET", url, nil)
+			var chatData terminal.ChatData
+			err := request.JSON(req, 10, &chatData)
+			if err != nil {
+				terminal.Output.Log(err)
+				continue
+			}
+			tempMap := make(map[string]struct{})
+			for _, name := range chatData.Chatters.Vips {
+				tempMap[name] = struct{}{}
+			}
+
+			for _, name := range chatData.Chatters.Moderators {
+				tempMap[name] = struct{}{}
+			}
+
+			for _, name := range chatData.Chatters.Viewers {
+				tempMap[name] = struct{}{}
+			}
+
+			for _, name := range chatData.Chatters.Broadcaster {
+				tempMap[name] = struct{}{}
+			}
+			for k, stats := range bot.Stats {
+				_, ok := tempMap[k]
+				tx, err := db.Begin()
+				if err != nil {
+					terminal.Output.Log(err)
+					return
+				}
+				defer tx.Rollback()
+				diff := time.Since(stats.LastCheck)
+				stats.LastCheck = time.Now()
+				msgCount := stats.MsgCount - stats.MsgCountPrev
+				stats.MsgCountPrev = stats.MsgCount
+				if ok {
+					stats.WatchTime += diff
+					tx.Exec("UPDATE Stats SET MsgCount=MsgCount+$1, WatchTime=WatchTime+$2 WHERE Username=$3", msgCount, diff, k)
+				} else {
+					tx.Exec("UPDATE Stats SET MsgCount=ISNULL(MsgCount, 0)+$1 WHERE Username=$2", msgCount, k)
+				}
+
+				delete(tempMap, k)
+			}
+			for k := range tempMap {
+				var stats Stats
+				stats.LastCheck = time.Now()
+				bot.Stats[k] = &stats
+			}
+		case name := <-ch:
+			if stats, ok := bot.Stats[name]; ok {
+				stats.MsgCount += 1
+				stats.WatchTime += time.Since(stats.LastCheck)
+				stats.LastCheck = time.Now()
+			} else {
+				var stats Stats
+				stats.LastCheck = time.Now()
+				bot.Stats[name] = &stats
+			}
+		case <-ticker1.C:
+			enc := gob.NewEncoder(&b)
+			err := enc.Encode(bot.Stats)
+			if err != nil {
+				terminal.Output.Log(err)
+				return
+			}
+			_, err = conn.Do("HSET", bot.Channel, "stats", b.Bytes())
+			b.Reset()
+			if err != nil {
+				terminal.Output.Log(err)
+				return
+			}
+		}
+	}
+}
+
 func (bot *Bot) SpamHistory(spamMsg string, duration time.Duration) error {
 	if _, err := bot.File.Seek(0, io.SeekStart); err != nil {
 		panic(err)
@@ -416,7 +517,7 @@ type Spam struct {
 	Messages []string
 }
 
-func (bot *Bot) parseChat(line string, logChan chan<- *Message, afkChan chan<- *Message, redisConn redis.Conn) {
+func (bot *Bot) parseChat(line string, logChan chan<- *Message, afkChan chan<- *Message, statsChan chan<- string, redisConn redis.Conn) {
 	if strings.Contains(line, "PRIVMSG") {
 		re := regexp.MustCompile(`emotes=(.*?);|@(.*?)\.tmi\.twitch\.tv|PRIVMSG.*?:(.*)|id=(.*?);`)
 		match := re.FindAllStringSubmatch(line[1:], -1)
@@ -433,6 +534,7 @@ func (bot *Bot) parseChat(line string, logChan chan<- *Message, afkChan chan<- *
 			if messageLength >= 300 && messageLength <= 2000 {
 				go bot.pasteWriter(&message)
 			}
+			statsChan <- message.Username
 			if bot.checkMessage(&message) {
 				return
 			}
@@ -650,6 +752,7 @@ func startBot(channel string, botInstances map[string]*Bot) {
 		StopChannel: make(chan struct{}),
 		BadWords:    initBadWords(),
 		Authority:   initAuthority(),
+		Stats:       make(map[string]*Stats),
 		Warn:        Warn{Warnings: make(map[string]*[]Warning)},
 	}
 	botInstances[channel] = &bot

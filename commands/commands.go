@@ -199,6 +199,14 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   TOP,
 			Handler: s.EnableCommand,
 		},
+		// !stats
+		"stats": &Command{
+			Enabled: true,
+			Name:    "stats",
+			Cd:      5,
+			Level:   MIDDLE,
+			Handler: s.StatsCommand,
+		},
 	}}
 	s.m[channel] = c
 }
@@ -808,6 +816,46 @@ func (s *CommandsServer) EnableCommand(msg *pb.Message, stream pb.Commands_Parse
 	if _, ok := s.m[msg.Channel].Commands[body]; ok {
 		s.m[msg.Channel].Commands[body].Enabled = true
 		retMessage = fmt.Sprintf("!%s command has been enabled", body)
+	}
+	stream.Send(&pb.ReturnMessage{Text: retMessage})
+	return nil
+}
+
+type Stats struct {
+	MsgCount     int
+	MsgCountPrev int
+	WatchTime    time.Duration
+	LastCheck    time.Time
+}
+
+func (s *CommandsServer) StatsCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	conn := pool.Get()
+	defer conn.Close()
+	data, err := redis.Bytes(conn.Do("HGET", msg.Channel, "stats"))
+	if err != nil {
+		return err
+	}
+	b := bytes.NewBuffer(data)
+	dec := gob.NewDecoder(b)
+	var m map[string]Stats
+	dec.Decode(&m)
+	stats, ok := m[msg.Username]
+	if !ok {
+		return errors.New("!stats: username not found")
+	}
+	stats.WatchTime += time.Since(stats.LastCheck)
+	stats.LastCheck = time.Now()
+	m[msg.Username] = stats
+	retMessage := fmt.Sprintf("@%s your stats for today: messages: %d, watch time: %s", msg.Username, stats.MsgCount, stats.WatchTime.Truncate(time.Second))
+	b.Reset()
+	enc := gob.NewEncoder(b)
+	err = enc.Encode(m)
+	if err != nil {
+		return err
+	}
+	_, err = conn.Do("HSET", msg.Channel, "stats", b.Bytes())
+	if err != nil {
+		return err
 	}
 	stream.Send(&pb.ReturnMessage{Text: retMessage})
 	return nil
