@@ -125,10 +125,10 @@ func (bot *Bot) Connect() {
 		terminal.Output.Log(err)
 	}
 
-	status, err := redis.String(redisConn.Do("HGET", bot.Channel, "status"))
+	status, err := redis.String(redisConn.Do("GET", "status:"+bot.Channel))
 	if err != nil {
 		terminal.Output.Log(err)
-		_, err = redisConn.Do("HSET", bot.Channel, "status", "Running")
+		_, err = redisConn.Do("SET", "status:"+bot.Channel, "Running")
 	}
 
 	if status != "" {
@@ -369,8 +369,7 @@ func (bot *Bot) checkStatus(invalidateConn redis.Conn, getConn redis.Conn) {
 			terminal.Output.Log(err)
 			continue
 		}
-
-		status, err := redis.String(getConn.Do("HGET", bot.Channel, "status"))
+		status, err := redis.String(getConn.Do("GET", "status:"+bot.Channel))
 		if err != nil {
 			terminal.Output.Log(err)
 		}
