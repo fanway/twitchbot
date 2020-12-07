@@ -261,7 +261,7 @@ func (bot *Bot) checkMessage(msg *Message) bool {
 func (bot *Bot) checkReminders() {
 	conn := pool.Get()
 	defer conn.Close()
-	conn.Send("SUBSCRIBE", "reminders")
+	conn.Send("SUBSCRIBE", "reminders:"+bot.Channel)
 	conn.Flush()
 	conn.Receive()
 	for {

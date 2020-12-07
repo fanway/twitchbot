@@ -735,7 +735,7 @@ func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_Parse
 	time.AfterFunc(t, func() {
 		conn := pool.Get()
 		defer conn.Close()
-		conn.Send("PUBLISH", "reminders", retMsg)
+		conn.Send("PUBLISH", "reminders:"+msg.Channel, retMsg)
 		conn.Flush()
 	})
 	return nil
