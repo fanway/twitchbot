@@ -265,12 +265,21 @@ func (bot *Bot) checkReminders() {
 	conn.Flush()
 	conn.Receive()
 	for {
-		reminders, err := redis.Strings(conn.Receive())
-		if err != nil {
-			terminal.Output.Log(err)
-			continue
+		select {
+		case <-bot.StopChannel:
+			return
+		default:
+			if err := conn.Err(); err != nil {
+				terminal.Output.Log(err)
+				return
+			}
+			reminders, err := redis.Strings(conn.Receive())
+			if err != nil {
+				terminal.Output.Log(err)
+				continue
+			}
+			bot.SendMessage(reminders[2])
 		}
-		bot.SendMessage(reminders[2])
 	}
 }
 
@@ -287,39 +296,47 @@ func (bot *Bot) checkAfk(ch <-chan *Message) {
 	var dec *gob.Decoder
 	conn := pool.Get()
 	for {
-		msg := <-ch
-		field := "afk:" + msg.Username
-		data, err := redis.Bytes(conn.Do("HGET", bot.Channel, field))
-		if err == nil {
-			dec = gob.NewDecoder(&b)
-			b.Write(data)
-			err := dec.Decode(&afk)
-			if err != nil {
+		select {
+		case msg := <-ch:
+			field := "afk:" + msg.Username
+			if err := conn.Err(); err != nil {
+				terminal.Output.Log(err)
+				return
+			}
+			data, err := redis.Bytes(conn.Do("HGET", bot.Channel, field))
+			if err == nil {
+				dec = gob.NewDecoder(&b)
+				b.Write(data)
+				err := dec.Decode(&afk)
+				if err != nil {
+					terminal.Output.Log(err)
+				}
+				retText = fmt.Sprintf("%s was afk: %s (%s)", msg.Username, afk.Message, time.Since(afk.Time).Truncate(time.Second))
+				bot.SendMessage(retText)
+				conn.Do("HDEL", bot.Channel, field)
+				b.Reset()
+			} else {
 				terminal.Output.Log(err)
 			}
-			retText = fmt.Sprintf("%s was afk: %s (%s)", msg.Username, afk.Message, time.Since(afk.Time).Truncate(time.Second))
+			match := re.FindStringSubmatch(msg.Text)
+			if len(match) == 0 {
+				continue
+			}
+			field = "afk:" + match[1]
+			data, err = redis.Bytes(conn.Do("HGET", bot.Channel, field))
+			if err != nil {
+				terminal.Output.Log(err)
+				continue
+			}
+			b.Write(data)
+			dec = gob.NewDecoder(&b)
+			dec.Decode(&afk)
+			retText = fmt.Sprintf("@%s %s is afk: %s. Last seen: %s ago", msg.Username, match[1], afk.Message, time.Since(afk.Time).Truncate(time.Second))
 			bot.SendMessage(retText)
-			conn.Do("HDEL", bot.Channel, field)
 			b.Reset()
-		} else {
-			terminal.Output.Log(err)
+		case <-bot.StopChannel:
+			return
 		}
-		match := re.FindStringSubmatch(msg.Text)
-		if len(match) == 0 {
-			continue
-		}
-		field = "afk:" + match[1]
-		data, err = redis.Bytes(conn.Do("HGET", bot.Channel, field))
-		if err != nil {
-			terminal.Output.Log(err)
-			continue
-		}
-		b.Write(data)
-		dec = gob.NewDecoder(&b)
-		dec.Decode(&afk)
-		retText = fmt.Sprintf("@%s %s is afk: %s. Last seen: %s ago", msg.Username, match[1], afk.Message, time.Since(afk.Time).Truncate(time.Second))
-		bot.SendMessage(retText)
-		b.Reset()
 	}
 }
 func (bot *Bot) pasteWriter(msg *Message) {
@@ -343,6 +360,10 @@ func (bot *Bot) checkStatus(invalidateConn redis.Conn, getConn redis.Conn) {
 		return
 	}
 	for {
+		if err := invalidateConn.Err(); err != nil {
+			terminal.Output.Log(err)
+			return
+		}
 		_, err := invalidateConn.Receive()
 		if err != nil {
 			terminal.Output.Log(err)

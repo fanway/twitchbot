@@ -755,7 +755,10 @@ func (s *CommandsServer) AfkCommand(msg *pb.Message, stream pb.Commands_ParseAnd
 		terminal.Output.Log(err)
 		return err
 	}
-	conn.Do("HSET", msg.Channel, "afk:"+msg.Username, b.Bytes())
+	_, err = conn.Do("HSET", msg.Channel, "afk:"+msg.Username, b.Bytes())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
