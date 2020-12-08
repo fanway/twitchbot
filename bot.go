@@ -434,17 +434,24 @@ func (bot *Bot) checkStats(ch <-chan string) {
 					return
 				}
 				defer tx.Rollback()
-				diff := time.Since(stats.LastCheck)
+				watchTimeDiff := time.Since(stats.LastCheck)
 				stats.LastCheck = time.Now()
-				msgCount := stats.MsgCount - stats.MsgCountPrev
+				msgCountDiff := stats.MsgCount - stats.MsgCountPrev
 				stats.MsgCountPrev = stats.MsgCount
 				if ok {
-					stats.WatchTime += diff
-					tx.Exec("UPDATE Stats SET MsgCount=MsgCount+$1, WatchTime=WatchTime+$2 WHERE Username=$3", msgCount, diff, k)
+					stats.WatchTime += watchTimeDiff
+					_, err := tx.Exec("INSERT INTO Stats(Channel, Username, MsgCount, WatchTime) VALUES($1,$2,$3,$4) ON CONFLICT(Channel, Username) DO UPDATE SET MsgCount=MsgCount+$5, WatchTime=WatchTime+$6;", bot.Channel[1:], k, stats.MsgCount, stats.WatchTime, msgCountDiff, watchTimeDiff)
+					if err != nil {
+						terminal.Output.Println(err)
+					}
 				} else {
-					tx.Exec("UPDATE Stats SET MsgCount=ISNULL(MsgCount, 0)+$1 WHERE Username=$2", msgCount, k)
+					_, err := tx.Exec("INSERT INTO Stats(Channel, Username, MsgCount) VALUES($1,$2,$3) ON CONFLICT(Channel, Username) DO UPDATE SET MsgCount=MsgCount+$4;", bot.Channel[1:], k, stats.MsgCount, msgCountDiff)
+					if err != nil {
+						terminal.Output.Println(err)
+					}
 				}
 
+				tx.Commit()
 				delete(tempMap, k)
 			}
 			for k := range tempMap {
@@ -459,6 +466,7 @@ func (bot *Bot) checkStats(ch <-chan string) {
 				stats.LastCheck = time.Now()
 			} else {
 				var stats Stats
+				stats.MsgCount = 1
 				stats.LastCheck = time.Now()
 				bot.Stats[name] = &stats
 			}
