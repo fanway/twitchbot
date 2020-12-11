@@ -24,6 +24,7 @@ import (
 	"twitchStats/markov"
 	"twitchStats/request"
 	"twitchStats/spotify"
+	"twitchStats/statistics"
 	"twitchStats/terminal"
 
 	"github.com/gomodule/redigo/redis"
@@ -821,13 +822,6 @@ func (s *CommandsServer) EnableCommand(msg *pb.Message, stream pb.Commands_Parse
 	return nil
 }
 
-type Stats struct {
-	MsgCount     int
-	MsgCountPrev int
-	WatchTime    time.Duration
-	LastCheck    time.Time
-}
-
 func (s *CommandsServer) StatsCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	conn := pool.Get()
 	defer conn.Close()
@@ -837,7 +831,7 @@ func (s *CommandsServer) StatsCommand(msg *pb.Message, stream pb.Commands_ParseA
 	}
 	b := bytes.NewBuffer(data)
 	dec := gob.NewDecoder(b)
-	var m map[string]Stats
+	var m map[string]statistics.Stats
 	dec.Decode(&m)
 	stats, ok := m[msg.Username]
 	if !ok {

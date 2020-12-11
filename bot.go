@@ -23,6 +23,7 @@ import (
 	"twitchStats/database"
 	"twitchStats/logsparser"
 	"twitchStats/request"
+	"twitchStats/statistics"
 	"twitchStats/terminal"
 
 	"github.com/gomodule/redigo/redis"
@@ -52,7 +53,7 @@ type Bot struct {
 	Warn        Warn
 	BadWords    map[string]struct{}
 	Spam        Spam
-	Stats       map[string]*Stats
+	Stats       map[string]*statistics.Stats
 	GrpcClient  pb.CommandsClient
 }
 
@@ -381,13 +382,6 @@ func (bot *Bot) checkStatus(invalidateConn redis.Conn, getConn redis.Conn) {
 	}
 }
 
-type Stats struct {
-	MsgCount     int
-	MsgCountPrev int
-	WatchTime    time.Duration
-	LastCheck    time.Time
-}
-
 func (bot *Bot) checkStats(ch <-chan string) {
 	ticker := time.NewTicker(5 * time.Minute)
 	ticker1 := time.NewTicker(30 * time.Second)
@@ -402,29 +396,10 @@ func (bot *Bot) checkStats(ch <-chan string) {
 	for {
 		select {
 		case <-ticker.C:
-			url := "https://tmi.twitch.tv/group/user/" + bot.Channel[1:] + "/chatters"
-			req, _ := http.NewRequest("GET", url, nil)
-			var chatData terminal.ChatData
-			err := request.JSON(req, 10, &chatData)
+			tempMap, err := statistics.GetUsers(bot.Channel[1:])
 			if err != nil {
 				terminal.Output.Log(err)
 				continue
-			}
-			tempMap := make(map[string]struct{})
-			for _, name := range chatData.Chatters.Vips {
-				tempMap[name] = struct{}{}
-			}
-
-			for _, name := range chatData.Chatters.Moderators {
-				tempMap[name] = struct{}{}
-			}
-
-			for _, name := range chatData.Chatters.Viewers {
-				tempMap[name] = struct{}{}
-			}
-
-			for _, name := range chatData.Chatters.Broadcaster {
-				tempMap[name] = struct{}{}
 			}
 			for k, stats := range bot.Stats {
 				_, ok := tempMap[k]
@@ -455,7 +430,7 @@ func (bot *Bot) checkStats(ch <-chan string) {
 				delete(tempMap, k)
 			}
 			for k := range tempMap {
-				var stats Stats
+				var stats statistics.Stats
 				stats.LastCheck = time.Now()
 				bot.Stats[k] = &stats
 			}
@@ -465,7 +440,7 @@ func (bot *Bot) checkStats(ch <-chan string) {
 				stats.WatchTime += time.Since(stats.LastCheck)
 				stats.LastCheck = time.Now()
 			} else {
-				var stats Stats
+				var stats statistics.Stats
 				stats.MsgCount = 1
 				stats.LastCheck = time.Now()
 				bot.Stats[name] = &stats
@@ -760,7 +735,7 @@ func startBot(channel string, botInstances map[string]*Bot) {
 		StopChannel: make(chan struct{}),
 		BadWords:    initBadWords(),
 		Authority:   initAuthority(),
-		Stats:       make(map[string]*Stats),
+		Stats:       make(map[string]*statistics.Stats),
 		Warn:        Warn{Warnings: make(map[string]*[]Warning)},
 	}
 	botInstances[channel] = &bot
