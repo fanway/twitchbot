@@ -139,6 +139,8 @@ func (bot *Bot) Connect() {
 		bot.Status = "Running"
 	}
 
+	getLastVods(bot.ChannelId)
+
 	go bot.checkStatus(redisInvalidateConn, redisConn)
 	go bot.checkReminders()
 	go bot.reader(wg, redisConn)
@@ -719,6 +721,65 @@ func (bot *Bot) updateEmotes() {
 	}
 
 	tx.Commit()
+}
+
+type Vods struct {
+	Data []struct {
+		ID           string    `json:"id"`
+		UserID       string    `json:"user_id"`
+		UserName     string    `json:"user_name"`
+		Title        string    `json:"title"`
+		Description  string    `json:"description"`
+		CreatedAt    time.Time `json:"created_at"`
+		PublishedAt  time.Time `json:"published_at"`
+		URL          string    `json:"url"`
+		ThumbnailURL string    `json:"thumbnail_url"`
+		Viewable     string    `json:"viewable"`
+		ViewCount    int       `json:"view_count"`
+		Language     string    `json:"language"`
+		Type         string    `json:"type"`
+		Duration     string    `json:"duration"`
+	} `json:"data"`
+	Pagination struct {
+		Cursor string `json:"cursor"`
+	} `json:"pagination"`
+}
+
+func getLastVods(channelId string) {
+	url := "https://api.twitch.tv/helix/videos?user_id=" + channelId + "&type=archive"
+	req := terminal.GetHelixGetRequest(url)
+	var vods Vods
+	err := request.JSON(req, 10, &vods)
+	if err != nil {
+		terminal.Output.Log(err)
+		return
+	}
+	if len(vods.Data) == 0 {
+		terminal.Output.Println("No vods in channel")
+		return
+	}
+	vodsFile, err := os.OpenFile(vods.Data[0].UserName+".vods", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		terminal.Output.Log(err)
+		return
+	}
+	defer vodsFile.Close()
+	w := bufio.NewWriter(vodsFile)
+	b, err := ioutil.ReadAll(vodsFile)
+	if err != nil {
+		terminal.Output.Log(err)
+		return
+	}
+	for _, v := range vods.Data {
+		id := strings.Split(v.ThumbnailURL, "/")[5]
+		str := "https://d3c27h4odz752x.cloudfront.net/" + id + "/chunked/index-dvr.m3u8"
+		isExist, err := regexp.Match(str, b)
+		if err != nil || isExist {
+			continue
+		}
+		fmt.Fprintf(w, "[%s] %s: %s\n", v.CreatedAt.Format("2006-01-02 15:04:05 -0700 MST"), v.Title, str)
+	}
+	w.Flush()
 }
 
 func startBot(channel string, botInstances map[string]*Bot) {
