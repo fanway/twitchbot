@@ -96,7 +96,7 @@ func (bot *Bot) Connect() {
 	var err error
 	bot.Conn, err = net.Dial("tcp", Server+":"+Port)
 	if err != nil {
-		fmt.Printf("Unable to connect!")
+		terminal.Output.Println("Unable to connect!")
 	}
 	fmt.Fprintf(bot.Conn, "CAP REQ :twitch.tv/tags\r\n")
 	fmt.Fprintf(bot.Conn, "PASS %s\r\n", bot.OAuth)
@@ -107,7 +107,7 @@ func (bot *Bot) Connect() {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 	grpcConn, err := grpc.Dial("localhost:3434", opts...)
 	if err != nil {
-		fmt.Println("Unable to connect to grpc")
+		terminal.Output.Println("Unable to connect to grpc")
 	}
 	defer grpcConn.Close()
 	bot.GrpcClient = pb.NewCommandsClient(grpcConn)
@@ -120,7 +120,6 @@ func (bot *Bot) Connect() {
 	invalidateConnId, err := redis.Int(redisInvalidateConn.Do("CLIENT", "ID"))
 	if err != nil {
 		terminal.Output.Log(err)
-		return
 	}
 
 	_, err = redisConn.Do("CLIENT", "TRACKING", "on", "REDIRECT", invalidateConnId)
