@@ -75,6 +75,14 @@ func GetHelixGetRequest(url string) *http.Request {
 	return req
 }
 
+func GetKrakenGetRequest(url string) *http.Request {
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Accept", "application/vnd.twitchtv.v5+json")
+	req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
+	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+	return req
+}
+
 func FindPerson(name string) {
 	db := database.Connect()
 	defer db.Close()

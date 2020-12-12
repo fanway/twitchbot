@@ -771,7 +771,20 @@ func getLastVods(channelId string) {
 		return
 	}
 	for _, v := range vods.Data {
-		id := strings.Split(v.ThumbnailURL, "/")[5]
+		var id string
+		if v.ThumbnailURL == "" {
+			url = "https://api.twitch.tv/kraken/videos/" + v.ID
+			req = terminal.GetKrakenGetRequest(url)
+			var video map[string]interface{}
+			err = request.JSON(req, 10, &video)
+			if err != nil {
+				terminal.Output.Log(err)
+				continue
+			}
+			id = strings.Split(video["seek_previews_url"].(string), "/")[3]
+		} else {
+			id = strings.Split(v.ThumbnailURL, "/")[5]
+		}
 		str := "https://d3c27h4odz752x.cloudfront.net/" + id + "/chunked/index-dvr.m3u8"
 		isExist, err := regexp.Match(str, b)
 		if err != nil || isExist {
