@@ -44,6 +44,7 @@ const (
 
 type Bot struct {
 	Channel     string
+	ChannelId   string
 	OAuth       string
 	Conn        net.Conn
 	File        *os.File
@@ -727,8 +728,13 @@ func startBot(channel string, botInstances map[string]*Bot) {
 		log.Fatal(err)
 	}
 	defer logfile.Close()
+	channelId, err := terminal.GetUserId(channel[1:])
+	if err != nil {
+		terminal.Output.Log(err)
+	}
 	bot := Bot{
 		Channel:     channel,
+		ChannelId:   channelId,
 		File:        logfile,
 		Conn:        nil,
 		OAuth:       os.Getenv("TWITCH_OAUTH_ENV"),

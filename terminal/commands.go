@@ -56,6 +56,25 @@ type ChatData struct {
 	} `json:"chatters"`
 }
 
+func GetUserId(name string) (string, error) {
+	url := "https://api.twitch.tv/helix/users?login=" + name
+	req := GetHelixGetRequest(url)
+	var iddata IdData
+	err := request.JSON(req, 10, &iddata)
+	if err != nil {
+		Output.Log(err)
+		return "", err
+	}
+	return iddata.Data[0].ID, nil
+}
+
+func GetHelixGetRequest(url string) *http.Request {
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
+	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+	return req
+}
+
 func FindPerson(name string) {
 	db := database.Connect()
 	defer db.Close()
@@ -68,18 +87,14 @@ func FindPerson(name string) {
 	var id string
 	row := tx.QueryRow("SELECT FromId FROM Followers WHERE FromName=$1;", name)
 	err = row.Scan(&id)
-	u := "https://api.twitch.tv/helix/users?login=" + name
-	req, _ := http.NewRequest("GET", u, nil)
-	req.Header.Set("Authorization", "Bearer "+strings.Split(os.Getenv("TWITCH_OAUTH_ENV"), ":")[1])
-	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+	req := GetHelixGetRequest("")
 	if err != nil {
-		var iddata IdData
-		err := request.JSON(req, 10, &iddata)
+		var err error
+		id, err = GetUserId(name)
 		if err != nil {
 			Output.Log(err)
 			return
 		}
-		id = iddata.Data[0].ID
 	}
 	req.URL, _ = url.Parse("https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id)
 	var followers Followers
@@ -118,7 +133,7 @@ func FindPerson(name string) {
 	rows, err := tx.Query("SELECT * FROM temp.Follow tm WHERE NOT EXISTS (SELECT * FROM Followers t WHERE tm.FromId = t.FromId AND tm.ToId = t.Toid);")
 
 	defer rows.Close()
-	u = "https://tmi.twitch.tv/group/user/" + strings.ToLower(name) + "/chatters"
+	u := "https://tmi.twitch.tv/group/user/" + strings.ToLower(name) + "/chatters"
 	req, _ = http.NewRequest("GET", u, nil)
 	var chatData ChatData
 	err = request.JSON(req, 10, &chatData)
