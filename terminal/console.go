@@ -158,7 +158,7 @@ func (r *CoreRenderer) getWindow() *SlidingWindow {
 func applyWindow(state []rune, arrowPointer int, s *SlidingWindow) string {
 	col := int(terminalSize.Col)
 	lenState := len(state)
-	if lenState+5 >= col {
+	if lenState >= col-5 || s.left > 0 {
 		if arrowPointer == lenState-s.left+1 {
 			if s.left > 0 {
 				s.left -= 1
@@ -166,7 +166,7 @@ func applyWindow(state []rune, arrowPointer int, s *SlidingWindow) string {
 			if s.right-s.left+1 > col-5 {
 				s.right -= 1
 			}
-		} else if arrowPointer == lenState-s.right-1 {
+		} else if arrowPointer <= lenState-s.right-1 {
 			s.left += 1
 			if s.right < lenState {
 				s.right += 1
@@ -427,6 +427,8 @@ func (console *Console) ProcessConsole() (string, int) {
 			console.state = append(console.state[:n+1], append(ch, console.state[n+1:]...)...)
 			if window.right-window.left+1 < int(terminalSize.Col)-5 {
 				window.right += 1
+			} else {
+				console.arrowState += "\033[C"
 			}
 			prefixBuffer.Clear()
 			tabBuffer.Clear()
