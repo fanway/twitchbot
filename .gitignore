@@ -3,5 +3,6 @@
 *.db
 *.json
 *.py
+*.vods
 .DS_Store
 redis/
