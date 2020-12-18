@@ -200,7 +200,7 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   TOP,
 			Handler: s.EnableCommand,
 		},
-		// !stats
+		// !stats <optional: all>
 		"stats": &Command{
 			Enabled: true,
 			Name:    "stats",
@@ -823,6 +823,7 @@ func (s *CommandsServer) EnableCommand(msg *pb.Message, stream pb.Commands_Parse
 }
 
 func (s *CommandsServer) StatsCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	_, body := extractCommand(msg)
 	conn := pool.Get()
 	defer conn.Close()
 	data, err := redis.Bytes(conn.Do("HGET", msg.Channel, "stats"))
@@ -840,7 +841,7 @@ func (s *CommandsServer) StatsCommand(msg *pb.Message, stream pb.Commands_ParseA
 	stats.WatchTime += time.Since(stats.LastCheck)
 	stats.LastCheck = time.Now()
 	m[msg.Username] = stats
-	retMessage := fmt.Sprintf("@%s your stats for today: messages: %d, watch time: %s", msg.Username, stats.MsgCount, stats.WatchTime.Truncate(time.Second))
+
 	b.Reset()
 	enc := gob.NewEncoder(b)
 	err = enc.Encode(m)
@@ -850,6 +851,27 @@ func (s *CommandsServer) StatsCommand(msg *pb.Message, stream pb.Commands_ParseA
 	_, err = conn.Do("HSET", msg.Channel, "stats", b.Bytes())
 	if err != nil {
 		return err
+	}
+
+	var retMessage string
+	if body == "all" {
+		db := database.Connect()
+		defer db.Close()
+		tx, err := db.Begin()
+		if err != nil {
+			terminal.Output.Log(err)
+		}
+		defer tx.Rollback()
+
+		var msgCount int
+		var watchTime int
+		if err := tx.QueryRow("SELECT MsgCount, WatchTime FROM Stats WHERE Channel=$1 AND Username=$2;", msg.Channel[1:], msg.Username).Scan(&msgCount, &watchTime); err != nil {
+			return err
+		}
+		retMessage = fmt.Sprintf("@%s your all time stats: messages: %d, watch time: %s", msg.Username, msgCount, time.Duration(watchTime).Truncate(time.Second))
+		tx.Commit()
+	} else {
+		retMessage = fmt.Sprintf("@%s your stats for today: messages: %d, watch time: %s", msg.Username, stats.MsgCount, stats.WatchTime.Truncate(time.Second))
 	}
 	stream.Send(&pb.ReturnMessage{Text: retMessage})
 	return nil
