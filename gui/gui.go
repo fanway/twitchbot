@@ -81,7 +81,7 @@ func sendSmartVote() {
 			for {
 				select {
 				case <-quit:
-					_, err := redisConn.Do("HSET", channel, "status", "Running")
+					_, err := redisConn.Do("SET", "status:"+channel, "Running")
 					if err != nil {
 						fmt.Println(err)
 					}

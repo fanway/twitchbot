@@ -474,7 +474,7 @@ func (s *CommandsServer) SmartVoteCommand(msg *pb.Message, stream pb.Commands_Pa
 
 	conn := pool.Get()
 	defer conn.Close()
-	_, err := conn.Do("HSET", msg.Channel, "status", "Smartvote")
+	_, err := conn.Do("SET", "status:"+msg.Channel, "Smartvote")
 	if err != nil {
 		return err
 	}
@@ -501,7 +501,7 @@ func (s *CommandsServer) SmartVoteCommand(msg *pb.Message, stream pb.Commands_Pa
 func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	conn := pool.Get()
 	defer conn.Close()
-	status, err := redis.String(conn.Do("HGET", msg.Channel, "status"))
+	status, err := redis.String(conn.Do("GET", "status:"+msg.Channel))
 	if err != nil {
 		return err
 	}
@@ -533,7 +533,7 @@ func (s *CommandsServer) VoteOptionsCommand(msg *pb.Message, stream pb.Commands_
 func (s *CommandsServer) VoteCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	conn := pool.Get()
 	defer conn.Close()
-	status, err := redis.String(conn.Do("HGET", msg.Channel, "status"))
+	status, err := redis.String(conn.Do("GET", "status:"+msg.Channel))
 	if err != nil {
 		return err
 	}
