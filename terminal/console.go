@@ -273,7 +273,7 @@ func (console *Console) Println(a ...interface{}) {
 }
 
 func (console *Console) Log(a ...interface{}) {
-	_, file, line, ok := runtime.Caller(2)
+	_, file, line, ok := runtime.Caller(1)
 	if !ok {
 		file = "???"
 		line = 0
