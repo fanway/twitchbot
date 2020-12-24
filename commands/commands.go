@@ -25,7 +25,6 @@ import (
 	"twitchStats/request"
 	"twitchStats/spotify"
 	"twitchStats/statistics"
-	"twitchStats/terminal"
 
 	"github.com/gomodule/redigo/redis"
 	"google.golang.org/grpc"
@@ -259,7 +258,7 @@ func (s *CommandsServer) ParseAndExec(msg *pb.Message, stream pb.Commands_ParseA
 		}
 		err := cmd.Cooldown(level)
 		if err != nil {
-			terminal.Output.Log(err)
+			fmt.Println(err)
 			return err
 		}
 		if level >= cmd.Level {
@@ -313,7 +312,7 @@ func (s *CommandsServer) StopVoteCommand(msg *pb.Message, stream pb.Commands_Par
 func (req *RequestedSongs) clear() (int, error) {
 	track, err := spotify.GetCurrentTrack()
 	if err != nil {
-		terminal.Output.Log(err)
+		fmt.Println(err)
 		return 0, err
 	}
 	req.Lock()
@@ -321,6 +320,7 @@ func (req *RequestedSongs) clear() (int, error) {
 	var i int
 	reqLength := len(req.Songs)
 	for i = 0; i < reqLength; i++ {
+		fmt.Println(req.Songs[i].SongName)
 		if req.Songs[i].SongName == track {
 			break
 		}
@@ -375,7 +375,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 	_, params := extractCommand(msg)
 	track, err := spotify.SearchTrack(params)
 	if err != nil {
-		terminal.Output.Log(err)
+		fmt.Println(err)
 		return err
 	}
 	if len(track.Tracks.Items) == 0 {
@@ -386,7 +386,7 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 
 	err = spotify.AddToPlaylist(track.Tracks.Items[0].URI)
 	if err != nil {
-		terminal.Output.Log(err)
+		fmt.Println(err)
 		return err
 	}
 	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
@@ -425,7 +425,7 @@ func (s *CommandsServer) RemoveRequestedTrack(msg *pb.Message, stream pb.Command
 func (s *CommandsServer) CurrentTrack(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	track, err := spotify.GetCurrentTrack()
 	if err != nil {
-		terminal.Output.Log(err)
+		fmt.Println(err)
 		return err
 	}
 	if track != "" {
@@ -566,7 +566,7 @@ func FfzBttv(emote string) (string, error) {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		terminal.Output.Log(err)
+		fmt.Println(err)
 	}
 	defer tx.Rollback()
 
@@ -615,7 +615,7 @@ func addEmote(url, code string) error {
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		terminal.Output.Log(err)
+		fmt.Println(err)
 	}
 	defer tx.Rollback()
 	_, err = tx.Exec("INSERT INTO ffzbttv(url, code) VALUES($1,$2);", url, code)
@@ -731,7 +731,7 @@ func (s *CommandsServer) RemindCommand(msg *pb.Message, stream pb.Commands_Parse
 	}
 	t, err := time.ParseDuration(params[0])
 	if err != nil {
-		terminal.Output.Log(err)
+		fmt.Println(err)
 		return err
 	}
 	var remindMessage string
@@ -761,7 +761,7 @@ func (s *CommandsServer) AfkCommand(msg *pb.Message, stream pb.Commands_ParseAnd
 		Time    time.Time
 	}{body, time.Now()})
 	if err != nil {
-		terminal.Output.Log(err)
+		fmt.Println(err)
 		return err
 	}
 	_, err = conn.Do("HSET", msg.Channel, "afk:"+msg.Username, b.Bytes())
@@ -859,7 +859,7 @@ func (s *CommandsServer) StatsCommand(msg *pb.Message, stream pb.Commands_ParseA
 		defer db.Close()
 		tx, err := db.Begin()
 		if err != nil {
-			terminal.Output.Log(err)
+			fmt.Println(err)
 		}
 		defer tx.Rollback()
 
