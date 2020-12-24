@@ -146,6 +146,105 @@ type Current struct {
 	} `json:"item"`
 }
 
+type Playlist struct {
+	Collaborative bool   `json:"collaborative"`
+	Description   string `json:"description"`
+	ExternalUrls  struct {
+		Spotify string `json:"spotify"`
+	} `json:"external_urls"`
+	Followers struct {
+		Href  interface{} `json:"href"`
+		Total int         `json:"total"`
+	} `json:"followers"`
+	Href   string `json:"href"`
+	ID     string `json:"id"`
+	Images []struct {
+		URL string `json:"url"`
+	} `json:"images"`
+	Name  string `json:"name"`
+	Owner struct {
+		ExternalUrls struct {
+			Spotify string `json:"spotify"`
+		} `json:"external_urls"`
+		Href string `json:"href"`
+		ID   string `json:"id"`
+		Type string `json:"type"`
+		URI  string `json:"uri"`
+	} `json:"owner"`
+	Public     interface{} `json:"public"`
+	SnapshotID string      `json:"snapshot_id"`
+	Tracks     struct {
+		Href  string `json:"href"`
+		Items []struct {
+			AddedAt time.Time `json:"added_at"`
+			AddedBy struct {
+				ExternalUrls struct {
+					Spotify string `json:"spotify"`
+				} `json:"external_urls"`
+				Href string `json:"href"`
+				ID   string `json:"id"`
+				Type string `json:"type"`
+				URI  string `json:"uri"`
+			} `json:"added_by"`
+			IsLocal bool `json:"is_local"`
+			Track   struct {
+				Album struct {
+					AlbumType        string   `json:"album_type"`
+					AvailableMarkets []string `json:"available_markets"`
+					ExternalUrls     struct {
+						Spotify string `json:"spotify"`
+					} `json:"external_urls"`
+					Href   string `json:"href"`
+					ID     string `json:"id"`
+					Images []struct {
+						Height int    `json:"height"`
+						URL    string `json:"url"`
+						Width  int    `json:"width"`
+					} `json:"images"`
+					Name string `json:"name"`
+					Type string `json:"type"`
+					URI  string `json:"uri"`
+				} `json:"album"`
+				Artists []struct {
+					ExternalUrls struct {
+						Spotify string `json:"spotify"`
+					} `json:"external_urls"`
+					Href string `json:"href"`
+					ID   string `json:"id"`
+					Name string `json:"name"`
+					Type string `json:"type"`
+					URI  string `json:"uri"`
+				} `json:"artists"`
+				AvailableMarkets []string `json:"available_markets"`
+				DiscNumber       int      `json:"disc_number"`
+				DurationMs       int      `json:"duration_ms"`
+				Explicit         bool     `json:"explicit"`
+				ExternalIds      struct {
+					Isrc string `json:"isrc"`
+				} `json:"external_ids"`
+				ExternalUrls struct {
+					Spotify string `json:"spotify"`
+				} `json:"external_urls"`
+				Href        string `json:"href"`
+				ID          string `json:"id"`
+				Name        string `json:"name"`
+				Popularity  int    `json:"popularity"`
+				PreviewURL  string `json:"preview_url"`
+				TrackNumber int    `json:"track_number"`
+				Type        string `json:"type"`
+				URI         string `json:"uri"`
+			} `json:"track"`
+		} `json:"items"`
+		Limit    int         `json:"limit"`
+		Next     string      `json:"next"`
+		Offset   int         `json:"offset"`
+		Previous interface{} `json:"previous"`
+		Total    int         `json:"total"`
+	} `json:"tracks"`
+	Type string `json:"type"`
+	URI  string `json:"uri"`
+}
+
 type Auth struct {
 	Auth         string    `json:"auth"`
 	Refresh      string    `json:"refresh"`
@@ -214,7 +313,7 @@ func AddToPlaylist(uri string) error {
 	req.Header.Set("Content-Type", "application/json")
 	err := request.JSON(req, 10, nil)
 	if err != nil {
-		fmt.Println(err)
+		terminal.Output.Log(err)
 		return err
 	}
 	return nil
@@ -244,21 +343,40 @@ func SkipToNextTrack() {
 	req.Header.Set("Authorization", "Bearer "+auth)
 	err := request.JSON(req, 10, nil)
 	if err != nil {
-		fmt.Println(err)
+		terminal.Output.Log(err)
 		return
 	}
 }
 
-func RemoveTrack(uri string) error {
+func RemoveTrack(uri string, pos int) error {
 	auth := checkAuth()
-	url := "https://api.spotify.com/v1/playlists/6U9yUDYW4uN845DUERRiMH//tracks"
-	req, _ := http.NewRequest("DELETE", url, bytes.NewBuffer([]byte("spotify:track:"+uri)))
+	url := "https://api.spotify.com/v1/playlists/6U9yUDYW4uN845DUERRiMH/tracks"
+	req, _ := http.NewRequest("DELETE", url, bytes.NewBuffer([]byte("\"tracks\":[{\"uri\":\""+"spotify:track:"+uri+"\", \"positions\": ["+strconv.Itoa(pos)+"]}]")))
 	req.Header.Set("Authorization", "Bearer "+auth)
 	req.Header.Set("Content-Type", "application/json")
 	err := request.JSON(req, 10, nil)
 	if err != nil {
-		fmt.Println(err)
+		terminal.Output.Log(err)
 		return err
 	}
 	return nil
+}
+
+func GetTotalInPlaylist() (int, error) {
+	auth := checkAuth()
+	url := "https://api.spotify.com/v1/playlists/6U9yUDYW4uN845DUERRiMH?fields=tracks.total"
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+auth)
+	req.Header.Set("Content-Type", "application/json")
+	var m map[string]interface{}
+	err := request.JSON(req, 10, &m)
+	if err != nil {
+		terminal.Output.Log(err)
+		return 0, err
+	}
+	total, err := m["tracks"].(map[string]interface{})["total"].(json.Number).Int64()
+	if err != nil {
+		return 0, err
+	}
+	return int(total), nil
 }

@@ -54,7 +54,11 @@ func (s *CommandsServer) initCommands(channel string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c := &Commands{Utils: Utils{File: logfile}, Commands: map[string]*Command{
+	totalInPlaylist, err := spotify.GetTotalInPlaylist()
+	if err != nil {
+		fmt.Println(err)
+	}
+	c := &Commands{Utils: Utils{File: logfile, RequestedSongs: RequestedSongs{TotalInPlaylist: totalInPlaylist}}, Commands: map[string]*Command{
 		// !logs <username, timeStart, timeEnd>
 		"logs": &Command{
 			Enabled: true,
@@ -118,6 +122,14 @@ func (s *CommandsServer) initCommands(channel string) {
 			Cd:      0,
 			Level:   LOW,
 			Handler: s.RequestTrack,
+		},
+		// !removesong <song name>
+		"removesong": &Command{
+			Enabled: true,
+			Name:    "removesong",
+			Cd:      0,
+			Level:   LOW,
+			Handler: s.RemoveRequestedTrack,
 		},
 		// !song
 		"song": &Command{
@@ -228,11 +240,13 @@ type Song struct {
 	SongName string
 	Uri      string
 	Duration time.Duration
+	Position int
 }
 
 type RequestedSongs struct {
 	sync.RWMutex
-	Songs []Song
+	TotalInPlaylist int
+	Songs           []Song
 }
 
 func extractCommand(msg *pb.Message) (string, string) {
@@ -329,9 +343,11 @@ func (req *RequestedSongs) clear() (int, error) {
 		return 0, errors.New("No songs found")
 	}
 	// How many previous songs we want to keep
-	const keep = 1
-	if i >= keep && i < len(req.Songs) {
+	keep := 1
+	if i >= keep {
 		req.Songs = req.Songs[i-keep:]
+	} else {
+		keep = i
 	}
 	return keep, nil
 }
@@ -339,24 +355,24 @@ func (req *RequestedSongs) clear() (int, error) {
 // Get all songs that the user requested
 func (s *CommandsServer) GetUserSongs(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	songs := []string{}
-	index, err := s.m[msg.Username].Utils.RequestedSongs.clear()
+	index, err := s.m[msg.Channel].Utils.RequestedSongs.clear()
 	if err != nil {
 		return err
 	}
-	s.m[msg.Username].Utils.RequestedSongs.RLock()
-	defer s.m[msg.Username].Utils.RequestedSongs.RUnlock()
+	s.m[msg.Channel].Utils.RequestedSongs.RLock()
+	defer s.m[msg.Channel].Utils.RequestedSongs.RUnlock()
 	var accDuration time.Duration
-	for i := index; i < len(s.m[msg.Username].Utils.RequestedSongs.Songs); i++ {
-		if s.m[msg.Username].Utils.RequestedSongs.Songs[i].Username == msg.Username {
+	for i := index; i < len(s.m[msg.Channel].Utils.RequestedSongs.Songs); i++ {
+		if s.m[msg.Channel].Utils.RequestedSongs.Songs[i].Username == msg.Username {
 			var t string
 			if i == index {
 				t = "playing"
 			} else {
 				t = accDuration.Round(time.Second).String()
 			}
-			songs = append(songs, s.m[msg.Username].Utils.RequestedSongs.Songs[i].SongName+" ["+t+"]")
+			songs = append(songs, s.m[msg.Channel].Utils.RequestedSongs.Songs[i].SongName+" ["+t+"]")
 		}
-		accDuration += s.m[msg.Username].Utils.RequestedSongs.Songs[i].Duration
+		accDuration += s.m[msg.Channel].Utils.RequestedSongs.Songs[i].Duration
 	}
 
 	if len(songs) == 0 {
@@ -379,7 +395,6 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 		return err
 	}
 	if len(track.Tracks.Items) == 0 {
-
 		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s track wansn't found", msg.Username)})
 		return errors.New("Track wasn't found")
 	}
@@ -390,35 +405,41 @@ func (s *CommandsServer) RequestTrack(msg *pb.Message, stream pb.Commands_ParseA
 		return err
 	}
 	trackName := track.Tracks.Items[0].Artists[0].Name + " - " + track.Tracks.Items[0].Name
-	s.m[msg.Username].Utils.RequestedSongs.Lock()
-	defer s.m[msg.Username].Utils.RequestedSongs.Unlock()
-	s.m[msg.Username].Utils.RequestedSongs.Songs = append(s.m[msg.Username].Utils.RequestedSongs.Songs, Song{Username: msg.Username, SongName: trackName, Uri: track.Tracks.Items[0].URI, Duration: time.Duration(track.Tracks.Items[0].DurationMs) * time.Millisecond})
+	s.m[msg.Channel].Utils.RequestedSongs.Lock()
+	defer s.m[msg.Channel].Utils.RequestedSongs.Unlock()
+	s.m[msg.Channel].Utils.RequestedSongs.TotalInPlaylist += 1
+	s.m[msg.Channel].Utils.RequestedSongs.Songs = append(s.m[msg.Channel].Utils.RequestedSongs.Songs, Song{Username: msg.Username, SongName: trackName, Uri: track.Tracks.Items[0].URI, Duration: time.Duration(track.Tracks.Items[0].DurationMs) * time.Millisecond, Position: s.m[msg.Channel].Utils.RequestedSongs.TotalInPlaylist})
 	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s was added to the playlist", msg.Username, trackName)})
 	return nil
 }
 
 func (s *CommandsServer) RemoveRequestedTrack(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
 	_, params := extractCommand(msg)
-	index, err := s.m[msg.Username].Utils.RequestedSongs.clear()
+	index, err := s.m[msg.Channel].Utils.RequestedSongs.clear()
 	if err != nil {
 		return err
 	}
-	err = spotify.RemoveTrack(s.m[msg.Username].Utils.RequestedSongs.Songs[index].Uri)
-	if err != nil {
-		return nil
-	}
-	s.m[msg.Username].Utils.RequestedSongs.Lock()
-	defer s.m[msg.Username].Utils.RequestedSongs.Unlock()
-	i := len(s.m[msg.Username].Utils.RequestedSongs.Songs)
+	s.m[msg.Channel].Utils.RequestedSongs.Lock()
+	defer s.m[msg.Channel].Utils.RequestedSongs.Unlock()
+	length := len(s.m[msg.Channel].Utils.RequestedSongs.Songs)
+	i := length
 	for ; i >= 0; i-- {
-		if params == s.m[msg.Username].Utils.RequestedSongs.Songs[i].SongName {
+		if params == s.m[msg.Channel].Utils.RequestedSongs.Songs[i].SongName {
 			break
 		}
 	}
 	if i == -1 {
 		return errors.New("No track found")
 	}
-	s.m[msg.Username].Utils.RequestedSongs.Songs = append(s.m[msg.Username].Utils.RequestedSongs.Songs[:i], s.m[msg.Username].Utils.RequestedSongs.Songs[i+1:]...)
+	for idx := i + 1; idx < length; idx++ {
+		s.m[msg.Channel].Utils.RequestedSongs.Songs[idx].Position -= 1
+	}
+	s.m[msg.Channel].Utils.RequestedSongs.Songs = append(s.m[msg.Channel].Utils.RequestedSongs.Songs[:i], s.m[msg.Channel].Utils.RequestedSongs.Songs[i+1:]...)
+	song := s.m[msg.Channel].Utils.RequestedSongs.Songs[index]
+	err = spotify.RemoveTrack(song.Uri, song.Position)
+	if err != nil {
+		return nil
+	}
 	return nil
 }
 
