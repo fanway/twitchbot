@@ -4,13 +4,23 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"twitchStats/request"
+	"twitchStats/terminal"
+)
+
+var (
+	_, b, _, _ = runtime.Caller(0)
+	basepath   = filepath.Dir(b)
+	name       = "/sp.json"
+	path       = basepath + name
 )
 
 type Search struct {
@@ -262,9 +272,13 @@ type Refresh struct {
 }
 
 func checkAuth() string {
-	file, _ := ioutil.ReadFile("sp.json")
+	file, err := ioutil.ReadFile(path)
+	if err != nil {
+		terminal.Output.Log(err)
+		return ""
+	}
 	var data Auth
-	err := json.Unmarshal(file, &data)
+	err = json.Unmarshal(file, &data)
 	if err != nil {
 		return ""
 	}
@@ -285,7 +299,7 @@ func checkAuth() string {
 		data.Expired = ref.ExpiresIn
 		data.Time = time.Now()
 		w, _ := json.Marshal(data)
-		ioutil.WriteFile("sp.json", w, 0644)
+		ioutil.WriteFile(path, w, 0644)
 	}
 	return data.Auth
 }
