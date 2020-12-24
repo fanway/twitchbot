@@ -95,7 +95,6 @@ func FindPerson(name string) {
 	var id string
 	row := tx.QueryRow("SELECT FromId FROM Followers WHERE FromName=$1;", name)
 	err = row.Scan(&id)
-	req := GetHelixGetRequest("")
 	if err != nil {
 		var err error
 		id, err = GetUserId(name)
@@ -104,6 +103,7 @@ func FindPerson(name string) {
 			return
 		}
 	}
+	req := GetHelixGetRequest("")
 	req.URL, _ = url.Parse("https://api.twitch.tv/helix/users/follows?first=100&from_id=" + id)
 	var followers Followers
 	err = request.JSON(req, 10, &followers)
@@ -131,7 +131,22 @@ func FindPerson(name string) {
 	}
 
 	tx.Exec("UPDATE Followers SET FromName=$1 WHERE FromId=$2", followers.Data[0].FromName, id)
+	var isLoginName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString
 	for _, d := range followers.Data {
+		if !isLoginName(d.ToName) {
+			req.URL, _ = url.Parse("https://api.twitch.tv/helix/users?id=" + d.ToID)
+			var m map[string][]map[string]interface{}
+			err = request.JSON(req, 10, &m)
+			if err != nil {
+				Output.Log(err)
+				return
+			}
+			if len(m["data"]) == 0 {
+				continue
+			}
+			d.ToName = m["data"][0]["login"].(string)
+		}
+
 		_, err := tx.Exec("INSERT INTO temp.Follow(FromId, FromName, ToId, ToName, FollowedAt) values($1, $2, $3, $4, $5);", d.FromID, d.FromName, d.ToID, d.ToName, d.FollowedAt)
 		if err != nil {
 			Output.Log(err)
