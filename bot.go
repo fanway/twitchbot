@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/textproto"
@@ -47,7 +46,6 @@ type Bot struct {
 	ChannelId   string
 	OAuth       string
 	Conn        net.Conn
-	File        *os.File
 	StopChannel chan struct{}
 	Authority   map[string]int
 	Status      string
@@ -195,10 +193,28 @@ type Message struct {
 }
 
 func (bot *Bot) logsWriter(logChan <-chan *Message) {
-	w := bufio.NewWriter(bot.File)
+	t := time.Now()
+	day := t.Day()
+	logfile, err := os.OpenFile("./logsparser/"+bot.Channel[1:]+"/"+bot.Channel[1:]+"-"+time.Now().Format("2006-01-02")+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return
+	}
+	defer logfile.Close()
+	w := bufio.NewWriter(logfile)
 	for {
 		select {
 		case message := <-logChan:
+			t = time.Now()
+			newDay := t.Day()
+			if newDay != day {
+				day = newDay
+				logfile.Close()
+				logfile, err = os.OpenFile("./logsparser/"+bot.Channel[1:]+t.Format("2006-01-02")+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+			}
+			if err != nil {
+				return
+			}
+
 			fmt.Fprintf(w, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05 -0700 MST"), message.Username, message.Text)
 			w.Flush()
 		case <-bot.StopChannel:
@@ -465,10 +481,14 @@ func (bot *Bot) checkStats(ch <-chan string) {
 }
 
 func (bot *Bot) SpamHistory(spamMsg string, duration time.Duration) error {
-	if _, err := bot.File.Seek(0, io.SeekStart); err != nil {
+	logfile, err := os.OpenFile("./logsparser/"+bot.Channel[1:]+"/"+bot.Channel[1:]+"-"+time.Now().Format("2006-01-02")+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return err
+	}
+	if _, err := logfile.Seek(0, io.SeekStart); err != nil {
 		panic(err)
 	}
-	r := bufio.NewScanner(bot.File)
+	r := bufio.NewScanner(logfile)
 	timeEnd := time.Now()
 	timeStart := timeEnd.Add(-duration)
 	for r.Scan() {
@@ -796,11 +816,6 @@ func getLastVods(channelId string) {
 }
 
 func startBot(channel string, botInstances map[string]*Bot) {
-	logfile, err := os.OpenFile(channel+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer logfile.Close()
 	channelId, err := terminal.GetUserId(channel[1:])
 	if err != nil {
 		terminal.Output.Log(err)
@@ -808,7 +823,6 @@ func startBot(channel string, botInstances map[string]*Bot) {
 	bot := Bot{
 		Channel:     channel,
 		ChannelId:   channelId,
-		File:        logfile,
 		Conn:        nil,
 		OAuth:       os.Getenv("TWITCH_OAUTH_ENV"),
 		StopChannel: make(chan struct{}),

@@ -2,6 +2,7 @@ package markov
 
 import (
 	"bufio"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"strings"
@@ -19,27 +20,37 @@ func add(m map[string]map[string]int, first, second string) {
 
 func Markov(channel string) (string, error) {
 	msg := ""
-	file, err := os.Open("../" + channel + ".log")
-	defer file.Close()
+	rootPath := "../logsparser/" + channel[1:] + "/"
+	files, err := ioutil.ReadDir(rootPath)
 	if err != nil {
 		return "", err
 	}
-	scanner := bufio.NewScanner(file)
 	m := make(map[string]map[string]int)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// parse message
-		str := strings.Split(strings.Split(line, "]")[1], ": ")[1]
-		sp := strings.Split(str, " ")
-		if len(sp) < 3 {
+	for _, fileInfo := range files {
+		if fileInfo.IsDir() {
 			continue
 		}
-		// add special word
-		add(m, "Begin", sp[0])
-		add(m, sp[len(sp)-1], "End")
-		// add words in message
-		for j := 0; j < len(sp)-1; j++ {
-			add(m, sp[j], sp[j+1])
+		fileName := fileInfo.Name()
+		file, err := os.Open(rootPath + fileName)
+		if err != nil {
+			return "", err
+		}
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			// parse message
+			str := strings.Split(strings.Split(line, "]")[1], ": ")[1]
+			sp := strings.Split(str, " ")
+			if len(sp) < 3 {
+				continue
+			}
+			// add special word
+			add(m, "Begin", sp[0])
+			add(m, sp[len(sp)-1], "End")
+			// add words in message
+			for j := 0; j < len(sp)-1; j++ {
+				add(m, sp[j], sp[j+1])
+			}
 		}
 	}
 	text := []string{"Begin"}

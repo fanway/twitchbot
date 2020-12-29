@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -50,15 +51,11 @@ type Commands struct {
 }
 
 func (s *CommandsServer) initCommands(channel string) {
-	logfile, err := os.OpenFile("../"+channel+".log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
 	totalInPlaylist, err := spotify.GetTotalInPlaylist()
 	if err != nil {
 		fmt.Println(err)
 	}
-	c := &Commands{Utils: Utils{File: logfile, RequestedSongs: RequestedSongs{TotalInPlaylist: totalInPlaylist}}, Commands: map[string]*Command{
+	c := &Commands{Utils: Utils{RequestedSongs: RequestedSongs{TotalInPlaylist: totalInPlaylist}}, Commands: map[string]*Command{
 		// !logs <username, timeStart, timeEnd>
 		"logs": &Command{
 			Enabled: true,
@@ -226,7 +223,6 @@ func (s *CommandsServer) initCommands(channel string) {
 type Utils struct {
 	SmartVote      SmartVote
 	RequestedSongs RequestedSongs
-	File           *os.File
 }
 
 type SmartVote struct {
@@ -467,21 +463,44 @@ func (s *CommandsServer) LogsCommand(msg *pb.Message, stream pb.Commands_ParseAn
 	if err != nil {
 		return err
 	}
-	if _, err = s.m[msg.Channel].Utils.File.Seek(0, io.SeekStart); err != nil {
-		panic(err)
+	rootPath := "../logsparser/" + msg.Channel[1:] + "/"
+	files, err := ioutil.ReadDir(rootPath)
+	if err != nil {
+		return err
 	}
-	fmt.Println(username, timeStart, timeEnd)
-	r := bufio.NewScanner(s.m[msg.Channel].Utils.File)
-	for r.Scan() {
-		str := r.Text()
-		parsedStr, err := logsparser.Parse(str, "", username, timeStart, timeEnd)
-		if err != nil {
+	for _, f := range files {
+		if f.IsDir() {
 			continue
 		}
-		stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3])})
-	}
-	if err := r.Err(); err != nil {
-		return err
+		fileName := f.Name()
+		logfile, err := os.Open(rootPath + fileName)
+		if err != nil {
+			return err
+		}
+		fileNameTime, err := time.Parse("2006-01-02", fileName[strings.Index(fileName, "-")+1:])
+		if err != nil {
+			return err
+		}
+		if fileNameTime.Before(timeStart) || fileNameTime.After(timeEnd) {
+			continue
+		}
+		if _, err = logfile.Seek(0, io.SeekStart); err != nil {
+			panic(err)
+		}
+		fmt.Println(username, timeStart, timeEnd)
+		r := bufio.NewScanner(logfile)
+		for r.Scan() {
+			str := r.Text()
+			parsedStr, err := logsparser.Parse(str, "", username, timeStart, timeEnd)
+			if err != nil {
+				continue
+			}
+			stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3])})
+		}
+		if err := r.Err(); err != nil {
+			return err
+		}
+		logfile.Close()
 	}
 	return nil
 }
@@ -797,27 +816,44 @@ func (s *CommandsServer) StalkCommand(msg *pb.Message, stream pb.Commands_ParseA
 	timeNow := time.Now()
 	timeStart := timeNow.Add(-24 * time.Hour)
 	timeEnd := timeNow
-	if _, err := s.m[msg.Channel].Utils.File.Seek(0, io.SeekStart); err != nil {
-		panic(err)
-	}
-	r := bufio.NewScanner(s.m[msg.Channel].Utils.File)
-	retMessage := "Found nothing, sorry! :)"
-	for r.Scan() {
-		str := r.Text()
-		parsedStr, err := logsparser.Parse(str, "", body, timeStart, timeEnd)
-		if err != nil {
-			continue
-		}
-		t, err := time.Parse(logsparser.Layout, parsedStr[1])
-		if err != nil {
-			continue
-		}
-		retMessage = fmt.Sprintf("%s was seen %s ago, last message: %s", body, time.Since(t).Truncate(time.Second), parsedStr[3])
-	}
-	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, retMessage)})
-	if err := r.Err(); err != nil {
+
+	rootPath := "../logsparser/" + msg.Channel[1:] + "/"
+	files, err := ioutil.ReadDir(rootPath)
+	if err != nil {
 		return err
 	}
+	retMessage := "Found nothing, sorry! :)"
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		fileName := f.Name()
+		logfile, err := os.Open(rootPath + fileName)
+		if err != nil {
+			return err
+		}
+		if _, err := logfile.Seek(0, io.SeekStart); err != nil {
+			panic(err)
+		}
+		r := bufio.NewScanner(logfile)
+		for r.Scan() {
+			str := r.Text()
+			parsedStr, err := logsparser.Parse(str, "", body, timeStart, timeEnd)
+			if err != nil {
+				continue
+			}
+			t, err := time.Parse(logsparser.Layout, parsedStr[1])
+			if err != nil {
+				continue
+			}
+			retMessage = fmt.Sprintf("%s was seen %s ago, last message: %s", body, time.Since(t).Truncate(time.Second), parsedStr[3])
+		}
+		if err := r.Err(); err != nil {
+			return err
+		}
+		logfile.Close()
+	}
+	stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, retMessage)})
 	return nil
 }
 
