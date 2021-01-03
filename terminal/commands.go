@@ -11,6 +11,7 @@ import (
 	"time"
 	"twitchStats/database"
 	"twitchStats/request"
+	"twitchStats/statistics"
 )
 
 type IdData struct {
@@ -39,21 +40,6 @@ type Followers struct {
 	Pagination struct {
 		Cursor string `json:"cursor"`
 	} `json:"pagination"`
-}
-
-type ChatData struct {
-	Links struct {
-	} `json:"_links"`
-	ChatterCount int `json:"chatter_count"`
-	Chatters     struct {
-		Broadcaster []string `json:"broadcaster"`
-		Vips        []string `json:"vips"`
-		Moderators  []string `json:"moderators"`
-		Staff       []string `json:"staff"`
-		Admins      []string `json:"admins"`
-		GlobalMods  []string `json:"global_mods"`
-		Viewers     []string `json:"viewers"`
-	} `json:"chatters"`
 }
 
 func GetUserId(name string) (string, error) {
@@ -156,16 +142,14 @@ func FindPerson(name string) {
 	rows, err := tx.Query("SELECT * FROM temp.Follow tm WHERE NOT EXISTS (SELECT * FROM Followers t WHERE tm.FromId = t.FromId AND tm.ToId = t.Toid);")
 
 	defer rows.Close()
-	u := "https://tmi.twitch.tv/group/user/" + strings.ToLower(name) + "/chatters"
-	req, _ = http.NewRequest("GET", u, nil)
-	var chatData ChatData
-	err = request.JSON(req, 10, &chatData)
+
+	lowercaseName := strings.ToLower(name)
+	m, err := statistics.GetUsers(lowercaseName)
 	if err != nil {
 		Output.Log(err)
 	}
 	online := false
-
-	if len(chatData.Chatters.Broadcaster) > 0 {
+	if _, ok := m[lowercaseName]; ok {
 		online = true
 	}
 	if online {
@@ -181,11 +165,7 @@ func FindPerson(name string) {
 	Output.Println("New channels: ")
 	for rows.Next() {
 		var idx int
-		var fromId string
-		var fromName string
-		var toId string
-		var toName string
-		var followersAt string
+		var fromId, fromName, toId, toName, followersAt string
 		err = rows.Scan(&idx, &fromId, &fromName, &toId, &toName, &followersAt)
 		if err != nil {
 			Output.Log(err)
@@ -231,35 +211,16 @@ func FindPerson(name string) {
 	//	tx.Commit()
 	//	return
 	//}
-	name = strings.ToLower(name)
 	Output.Println("Currently watching: ")
 	for rows.Next() {
 		var toName string
 		rows.Scan(&toName)
-		u = "https://tmi.twitch.tv/group/user/" + strings.ToLower(toName) + "/chatters"
-		req, _ := http.NewRequest("GET", u, nil)
-		var chatData ChatData
-		err = request.JSON(req, 10, &chatData)
+		m, err := statistics.GetUsers(strings.ToLower(toName))
 		if err != nil {
 			continue
 		}
-
-		for _, cname := range chatData.Chatters.Vips {
-			if cname == name {
-				Output.Print(toName + " ")
-			}
-		}
-
-		for _, cname := range chatData.Chatters.Moderators {
-			if cname == name {
-				Output.Print(toName + " ")
-			}
-		}
-
-		for _, cname := range chatData.Chatters.Viewers {
-			if cname == name {
-				Output.Print(toName + " ")
-			}
+		if _, ok := m[lowercaseName]; ok {
+			Output.Print(toName + " ")
 		}
 	}
 	tx.Commit()
