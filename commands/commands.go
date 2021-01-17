@@ -216,6 +216,14 @@ func (s *CommandsServer) initCommands(channel string) {
 			Level:   MIDDLE,
 			Handler: s.StatsCommand,
 		},
+		// !cmd <command> <message>
+		"cmd": &Command{
+			Enabled: true,
+			Name:    "cmd",
+			Cd:      5,
+			Level:   TOP,
+			Handler: s.CmdCommand,
+		},
 	}}
 	s.m[channel] = c
 }
@@ -931,6 +939,25 @@ func (s *CommandsServer) StatsCommand(msg *pb.Message, stream pb.Commands_ParseA
 		retMessage = fmt.Sprintf("@%s your stats for today: messages: %d, watch time: %s", msg.Username, stats.MsgCount, stats.WatchTime.Truncate(time.Second))
 	}
 	stream.Send(&pb.ReturnMessage{Text: retMessage})
+	return nil
+}
+
+func (s *CommandsServer) CmdCommand(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+	_, body := extractCommand(msg)
+	args := strings.Split(body, " ")
+	if len(args) < 2 {
+		return errors.New("!cmd: not enough args")
+	}
+	s.m[msg.Channel].Commands[args[0]] = &Command{
+		Enabled: true,
+		Name:    args[0],
+		Cd:      5,
+		Level:   LOW,
+		Handler: func(msg *pb.Message, stream pb.Commands_ParseAndExecServer) error {
+			stream.Send(&pb.ReturnMessage{Text: fmt.Sprintf("@%s %s", msg.Username, args[1])})
+			return nil
+		},
+	}
 	return nil
 }
 
