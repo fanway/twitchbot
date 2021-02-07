@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -347,7 +348,8 @@ func GetCurrentTrack() (string, error) {
 	for i := 1; i < len(curr.Item.Artists); i++ {
 		name += ", " + curr.Item.Artists[i].Name
 	}
-	return name + " - " + curr.Item.Name, nil
+	link := "https://open.spotify.com/track/" + strings.Split(curr.Item.URI, ":")[2]
+	return fmt.Sprintf("%s - %s. Link: %s", name, curr.Item.Name, link), nil
 }
 
 func SkipToNextTrack() {
