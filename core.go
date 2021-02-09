@@ -21,7 +21,13 @@ import (
 
 var pool *redis.Pool
 
-func parseCommand(str string, botInstances map[string]*Bot) {
+func execCommands(ch <-chan func()) {
+	for f := range ch {
+		f()
+	}
+}
+
+func parseCommand(str string, botInstances map[string]*Bot, ch chan<- func()) {
 	commandsChain := strings.Split(str, "|")
 	for _, s := range commandsChain {
 		s = strings.Trim(s, " ")
@@ -33,54 +39,58 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 		case "connect":
 			if len(args) != 1 {
 				terminal.Output.Println("Provide channel name")
-				break
+				return
 			}
 			if _, ok := botInstances[args[0]]; !ok {
 				go startBot(args[0], botInstances)
 			}
 			terminal.Output.CurrentChannel = args[0]
 		case "find":
-			if len(args) != 1 {
-				terminal.Output.Println("Provide channel name")
-				break
-			}
-			if args[0] == "list" {
-				rows := terminal.PersonsList("%")
-				for i := range rows {
-					terminal.Output.Print(rows[i] + " ")
+			ch <- func() {
+				if len(args) != 1 {
+					terminal.Output.Println("Provide channel name")
+					return
 				}
-				terminal.Output.Println("")
-			} else {
-				terminal.FindPerson(args[0])
+				if args[0] == "list" {
+					rows := terminal.PersonsList("%")
+					for i := range rows {
+						terminal.Output.Print(rows[i] + " ")
+					}
+					terminal.Output.Println("")
+				} else {
+					terminal.FindPerson(args[0])
+				}
 			}
 		case "asciify":
 			//terminal.Output.Println(asciify(args))
 		case "disconnect":
 			if len(args) != 1 {
 				terminal.Output.Println("Provide channel name")
-				break
+				return
 			}
 			if _, ok := botInstances[args[0]]; !ok {
 				terminal.Output.Println("No such channel")
-				break
+				return
 			}
 			botInstances[args[0]].Disconnect()
 			delete(botInstances, args[0])
 			terminal.Output.CurrentChannel = "#"
 		case "change":
-			if len(args) != 3 {
-				terminal.Output.Println("Provide valid args")
-				break
-			}
-			if _, ok := botInstances[args[0]]; ok {
-				botInstances[args[0]].changeAuthority(args[1], args[2])
-			} else {
-				terminal.Output.Println("Provide valid channel name to which bot is currently connected")
+			ch <- func() {
+				if len(args) != 3 {
+					terminal.Output.Println("Provide valid args")
+					return
+				}
+				if _, ok := botInstances[args[0]]; ok {
+					botInstances[args[0]].changeAuthority(args[1], args[2])
+				} else {
+					terminal.Output.Println("Provide valid channel name to which bot is currently connected")
+				}
 			}
 		case "clear":
 			if len(args) == 0 {
 				terminal.Output.Print("\033[H\033[J")
-				break
+				return
 			}
 			if args[0] == "buffer" {
 				terminal.Output.CommandsBuffer.Clear()
@@ -88,17 +98,17 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 		case "loademotes":
 			if len(botInstances) == 0 {
 				terminal.Output.Println("You are not connected to any channel")
-				break
+				return
 			}
 			go botInstances[terminal.Output.CurrentChannel].updateEmotes()
 		case "send":
 			if len(args) < 1 {
 				terminal.Output.Println("write message")
-				break
+				return
 			}
 			if terminal.Output.CurrentChannel == "#" {
 				terminal.Output.Println("connect to chat")
-				break
+				return
 			}
 			str := args[0]
 			for i := 1; i < len(args); i++ {
@@ -106,16 +116,18 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 			}
 			botInstances[terminal.Output.CurrentChannel].SendMessage(str)
 		case "markov":
-			if len(args) != 1 {
-				terminal.Output.Log("something went wrong")
-				break
+			ch <- func() {
+				if len(args) != 1 {
+					terminal.Output.Log("something went wrong")
+					return
+				}
+				msg, err := markov.Markov(args[0])
+				if err != nil {
+					terminal.Output.Log(err)
+					return
+				}
+				terminal.Output.Println(msg)
 			}
-			msg, err := markov.Markov(args[0])
-			if err != nil {
-				terminal.Output.Log(err)
-				break
-			}
-			terminal.Output.Println(msg)
 		case "spam":
 			bot := botInstances[terminal.Output.CurrentChannel]
 			duration := time.Duration(90) * time.Second
@@ -128,13 +140,13 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 					terminal.Output.Log(err)
 				}
 				bot.Spam.Clear()
-				break
+				return
 			case 2:
 				var err error
 				duration, err = time.ParseDuration(args[1])
 				if err != nil {
 					terminal.Output.Log(err)
-					break
+					return
 				}
 			}
 			bot.Spam.Add(args[0])
@@ -148,7 +160,7 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 		case "loadcomments":
 			if len(args) != 1 {
 				terminal.Output.Println("something went wrong")
-				break
+				return
 			}
 			var err error
 			terminal.Output.Comments, err = terminal.GetChatFromVods(args[0])
@@ -156,45 +168,47 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 				terminal.Output.Log(err)
 			}
 		case "sortcomments":
-			if terminal.Output.Comments == nil {
-				terminal.Output.Println("load some comments")
-				break
-			}
-			var timeStart time.Time
-			var timeEnd time.Time
-			commentsArgs := strings.Split(s[strings.Index(s, " ")+1:], ",")
-			length := len(commentsArgs)
-			if length == 1 {
-				timeEnd = time.Now()
-			} else if length == 3 {
-				var err error
-				timeStart, timeEnd, err = logsparser.ParseTime(commentsArgs[1], commentsArgs[2])
-				if err != nil {
-					terminal.Output.Log(err)
-					break
+			ch <- func() {
+				if terminal.Output.Comments == nil {
+					terminal.Output.Println("load some comments")
+					return
 				}
-			} else {
-				break
-			}
-			username := commentsArgs[0]
-			for _, comment := range terminal.Output.Comments {
-				parsedStr, err := logsparser.Parse(comment, "", username, timeStart, timeEnd)
-				if err != nil {
-					continue
+				var timeStart time.Time
+				var timeEnd time.Time
+				commentsArgs := strings.Split(s[strings.Index(s, " ")+1:], ",")
+				length := len(commentsArgs)
+				if length == 1 {
+					timeEnd = time.Now()
+				} else if length == 3 {
+					var err error
+					timeStart, timeEnd, err = logsparser.ParseTime(commentsArgs[1], commentsArgs[2])
+					if err != nil {
+						terminal.Output.Log(err)
+						return
+					}
+				} else {
+					return
 				}
-				terminal.Output.Print(fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3]))
+				username := commentsArgs[0]
+				for _, comment := range terminal.Output.Comments {
+					parsedStr, err := logsparser.Parse(comment, "", username, timeStart, timeEnd)
+					if err != nil {
+						continue
+					}
+					terminal.Output.Print(fmt.Sprintf("[%s] %s: %s", parsedStr[1], parsedStr[2], parsedStr[3]))
+				}
 			}
 		case "interactivesort":
 			terminal.InteractiveSort()
 		case "savechat":
 			if terminal.Output.Comments == nil {
 				terminal.Output.Println("load some comments")
-				break
+				return
 			}
 			file, err := os.OpenFile("vod.log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 			if err != nil {
 				terminal.Output.Log(err)
-				break
+				return
 			}
 			w := bufio.NewWriter(file)
 			for _, comment := range terminal.Output.Comments {
@@ -204,29 +218,31 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 		case "clearcomments":
 			if terminal.Output.Comments == nil {
 				terminal.Output.Println("load some comments")
-				break
+				return
 			}
 			terminal.Output.Comments = nil
 		case "searchtrack":
 			track, err := spotify.SearchTrack(s[strings.Index(s, " ")+1:])
 			if err != nil {
 				terminal.Output.Println(err)
-				break
+				return
 			}
 			spotify.AddToPlaylist(track.Tracks.Items[0].URI)
 		case "currenttrack":
-			track, err := spotify.GetCurrentTrack()
-			if err != nil {
-				terminal.Output.Log(err)
-				break
+			ch <- func() {
+				track, err := spotify.GetCurrentTrack()
+				if err != nil {
+					terminal.Output.Log(err)
+					return
+				}
+				terminal.Output.Println(track)
 			}
-			terminal.Output.Println(track)
 		case "nexttrack":
 			spotify.SkipToNextTrack()
 		case "changestatus":
 			if len(args) != 1 {
 				terminal.Output.Println("something went wrong")
-				break
+				return
 			}
 			bot := botInstances[terminal.Output.CurrentChannel]
 			conn := pool.Get()
@@ -236,11 +252,13 @@ func parseCommand(str string, botInstances map[string]*Bot) {
 				terminal.Output.Log(err)
 			}
 		case "crossfollow":
-			if len(args) != 2 {
-				terminal.Output.Println("not enough args")
-				break
+			ch <- func() {
+				if len(args) != 2 {
+					terminal.Output.Println("not enough args")
+					return
+				}
+				terminal.Output.Println(terminal.CrossFollow(args[0], args[1]))
 			}
-			terminal.Output.Println(terminal.CrossFollow(args[0], args[1]))
 		}
 	}
 }
@@ -253,11 +271,13 @@ func main() {
 	terminal.SetTerm()
 	coreRenderer := terminal.CoreRenderer{CurrentChannel: &terminal.Output.CurrentChannel}
 	terminal.Output.Renderer = &coreRenderer
+	ch := make(chan func(), 20)
+	go execCommands(ch)
 	for {
 		args, status := terminal.Output.ProcessConsole()
 		switch status {
 		case terminal.ENTER:
-			parseCommand(args, botInstaces)
+			parseCommand(args, botInstaces, ch)
 		}
 	}
 }
