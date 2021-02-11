@@ -153,9 +153,9 @@ func FindPerson(name string) {
 		online = true
 	}
 	if online {
-		Output.Println(name + " [ONLINE]")
+		Output.Println(name + " [ONLINE]" + " [" + time.Now().Format("15:04:05") + "]")
 	} else {
-		Output.Println(name + " [OFFLINE]")
+		Output.Println(name + " [OFFLINE]" + " [" + time.Now().Format("15:04:05") + "]")
 	}
 	Output.Println("-----------------------")
 
